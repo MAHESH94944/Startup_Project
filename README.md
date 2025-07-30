@@ -1,53 +1,229 @@
 # Ecommerce Backend API
 
-## Project Structure
+**Live Backend URL:** `https://warner-and-spencer-shoes.onrender.com`
 
-```
-backend/
-│
-├── controllers/
-│   ├── authController.js
-│   ├── userController.js
-│   ├── productController.js
-│   ├── cartController.js
-│   └── orderController.js
-│
-├── routes/
-│   ├── authRoutes.js
-│   ├── userRoutes.js
-│   ├── productRoutes.js
-│   ├── cartRoutes.js
-│   └── orderRoutes.js
-│
-├── models/
-│   ├── User.js
-│   ├── Product.js
-│   ├── Cart.js
-│   └── Order.js
-│
-├── middleware/
-│   ├── authMiddleware.js
-│   ├── errorHandler.js
-│   └── adminCheck.js
-│
-├── config/
-│   ├── db.js
-│   └── passport.js
-│
-├── utils/
-│   └── validator.js
-│
-├── .env
-├── server.js
-└── package.json
+## API Endpoints (Sequential Flow)
+
+### 1. Register User
+
+**POST** `/api/auth/register`
+
+#### Request Body
+
+```json
+{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "password": "StrongPassword123!"
+}
 ```
 
-## User Endpoints
+#### Response
 
-### Get Logged-in User's Profile
+```json
+{
+  "message": "User registered successfully",
+  "user": {
+    "id": "user_id",
+    "name": "John Doe",
+    "email": "john@example.com",
+    "role": "user"
+  }
+}
+```
 
-**GET** `/api/user/profile`  
-Headers: Requires authentication
+#### Frontend Implementation
+
+```javascript
+// Registration
+const register = async (userData) => {
+  try {
+    const response = await fetch(
+      "https://warner-and-spencer-shoes.onrender.com/api/auth/register",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include", // Important for cookies
+        body: JSON.stringify(userData),
+      }
+    );
+
+    const data = await response.json();
+    if (response.ok) {
+      console.log("User registered successfully:", data);
+      // Redirect to dashboard or login page
+    } else {
+      console.error("Registration failed:", data.message);
+    }
+  } catch (error) {
+    console.error("Network error:", error);
+  }
+};
+
+// Usage
+register({
+  name: "John Doe",
+  email: "john@example.com",
+  password: "StrongPassword123!",
+});
+```
+
+---
+
+### 2. Login User
+
+**POST** `/api/auth/login`
+
+#### Request Body
+
+```json
+{
+  "email": "john@example.com",
+  "password": "StrongPassword123!"
+}
+```
+
+#### Response
+
+```json
+{
+  "message": "Login successful",
+  "user": {
+    "id": "user_id",
+    "name": "John Doe",
+    "email": "john@example.com",
+    "role": "user"
+  }
+}
+```
+
+#### Frontend Implementation
+
+```javascript
+// Login
+const login = async (credentials) => {
+  try {
+    const response = await fetch(
+      "https://warner-and-spencer-shoes.onrender.com/api/auth/login",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include", // Important for cookies
+        body: JSON.stringify(credentials),
+      }
+    );
+
+    const data = await response.json();
+    if (response.ok) {
+      console.log("Login successful:", data);
+      localStorage.setItem("user", JSON.stringify(data.user)); // Store user info
+      // Redirect to dashboard
+      window.location.href = "/dashboard";
+    } else {
+      console.error("Login failed:", data.message);
+    }
+  } catch (error) {
+    console.error("Network error:", error);
+  }
+};
+
+// Usage
+login({
+  email: "john@example.com",
+  password: "StrongPassword123!",
+});
+```
+
+---
+
+### 3. Google OAuth Login
+
+**GET** `/api/auth/google`
+
+#### Frontend Implementation
+
+```javascript
+// Google Login - Redirect to Google OAuth
+const googleLogin = () => {
+  window.location.href =
+    "https://warner-and-spencer-shoes.onrender.com/api/auth/google";
+};
+
+// Handle Google callback (after successful login)
+// Google will redirect to your frontend with user data
+// You can check if user is logged in using the /me endpoint
+```
+
+---
+
+### 4. Get Current User Info
+
+**GET** `/api/auth/me`
+
+#### Response
+
+```json
+{
+  "user": {
+    "id": "user_id",
+    "name": "John Doe",
+    "email": "john@example.com",
+    "role": "user"
+  }
+}
+```
+
+#### Frontend Implementation
+
+```javascript
+// Check if user is authenticated
+const getCurrentUser = async () => {
+  try {
+    const response = await fetch(
+      "https://warner-and-spencer-shoes.onrender.com/api/auth/me",
+      {
+        method: "GET",
+        credentials: "include", // Important for cookies
+      }
+    );
+
+    const data = await response.json();
+    if (response.ok) {
+      console.log("Current user:", data.user);
+      return data.user;
+    } else {
+      console.log("User not authenticated");
+      return null;
+    }
+  } catch (error) {
+    console.error("Error fetching user:", error);
+    return null;
+  }
+};
+
+// Use this on app load to check authentication
+const checkAuth = async () => {
+  const user = await getCurrentUser();
+  if (user) {
+    localStorage.setItem("user", JSON.stringify(user));
+    // User is logged in
+  } else {
+    localStorage.removeItem("user");
+    // Redirect to login
+    window.location.href = "/login";
+  }
+};
+```
+
+---
+
+### 5. Get User Profile
+
+**GET** `/api/user/profile`
 
 #### Response
 
@@ -67,14 +243,40 @@ Headers: Requires authentication
 }
 ```
 
+#### Frontend Implementation
+
+```javascript
+// Get detailed user profile
+const getUserProfile = async () => {
+  try {
+    const response = await fetch(
+      "https://warner-and-spencer-shoes.onrender.com/api/user/profile",
+      {
+        method: "GET",
+        credentials: "include",
+      }
+    );
+
+    const data = await response.json();
+    if (response.ok) {
+      console.log("User profile:", data.user);
+      return data.user;
+    } else {
+      console.error("Failed to get profile:", data.message);
+    }
+  } catch (error) {
+    console.error("Error fetching profile:", error);
+  }
+};
+```
+
 ---
 
-### Update Logged-in User's Profile
+### 6. Update User Profile
 
-**PATCH** `/api/user/profile`  
-Headers: Requires authentication
+**PATCH** `/api/user/profile`
 
-#### Request Body (any of these fields)
+#### Request Body (any combination)
 
 ```json
 {
@@ -105,159 +307,198 @@ Headers: Requires authentication
 }
 ```
 
----
+#### Frontend Implementation
 
-## Auth Endpoints
+```javascript
+// Update user profile
+const updateProfile = async (updateData) => {
+  try {
+    const response = await fetch(
+      "https://warner-and-spencer-shoes.onrender.com/api/user/profile",
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify(updateData),
+      }
+    );
 
-### Register: **POST** `/api/auth/register`
+    const data = await response.json();
+    if (response.ok) {
+      console.log("Profile updated:", data);
+      localStorage.setItem("user", JSON.stringify(data.user)); // Update stored user
+      return data.user;
+    } else {
+      console.error("Update failed:", data.message);
+      throw new Error(data.message);
+    }
+  } catch (error) {
+    console.error("Error updating profile:", error);
+    throw error;
+  }
+};
 
-```json
-{
-  "name": "John Doe",
-  "email": "john@example.com",
-  "password": "StrongPassword123"
-}
-```
+// Usage examples
+// Update name only
+updateProfile({ name: "New Name" });
 
-### Login: **POST** `/api/auth/login`
+// Update phone only
+updateProfile({ phone: "9999999999" });
 
-```json
-{
-  "email": "john@example.com",
-  "password": "StrongPassword123"
-}
-```
-
-### Logout: **POST** `/api/auth/logout`
-
-### Get Current User: **GET** `/api/auth/me`
-
-### Google OAuth Login:
-
-- **GET** `/api/auth/google`
-- **GET** `/api/auth/google/callback`
-
----
-
-- All endpoints require JWT in HTTP-only cookie or Bearer token (where applicable).
-- All responses are JSON.
-- For Google login, use browser for OAuth flow, then use the returned token for API requests.
-
-## Error Handling
-
-- All endpoints return appropriate HTTP status codes and error messages.
-- Validation errors return 400 status.
-- Unauthorized access returns 401 status.
-
-## Security
-
-- Passwords are hashed using bcrypt.
-- JWT tokens are stored in HTTP-only cookies.
-- CORS is enabled for cross-origin requests.
-- Use HTTPS in production.
-
-## Environment Variables
-
-- All secrets and configuration are stored in `.env`.
-- Never commit `.env` to version control.
-
-## Running the Project
-
-```bash
-npm install
-npm start
-```
-
-## Contributing
-
-- Follow the folder structure.
-- Write clean, commented code.
-- Add tests for new features.
-
----
-
-## Notes
-
-- All responses set a JWT token in a secure, HTTP-only cookie.
-- Use these endpoints and sample data to test authentication with Postman.
-- For Google login, endpoint and instructions are included above.
-- Keep controllers, routes, and middleware in their respective folders for maintainability.
-
-## How to Test User Update API
-
-### 1. Register a User
-
-**POST** `/api/auth/register`
-
-```json
-{
-  "name": "Mahesh Jadhao",
-  "email": "mahesh@example.com",
-  "password": "Test@1234"
-}
+// Change password
+updateProfile({
+  oldPassword: "CurrentPassword123!",
+  password: "NewPassword123!",
+});
 ```
 
 ---
 
-### 2. Login
+### 7. Logout User
 
-**POST** `/api/auth/login`
+**POST** `/api/auth/logout`
+
+#### Response
 
 ```json
 {
-  "email": "mahesh@example.com",
-  "password": "Test@1234"
+  "message": "Logged out successfully"
 }
 ```
 
-- Copy the JWT token from the cookie or use it as a Bearer token for the next requests.
+#### Frontend Implementation
 
----
+```javascript
+// Logout
+const logout = async () => {
+  try {
+    const response = await fetch(
+      "https://warner-and-spencer-shoes.onrender.com/api/auth/logout",
+      {
+        method: "POST",
+        credentials: "include",
+      }
+    );
 
-### 3. Update Profile
-
-**PATCH** `/api/user/profile`  
-Headers:  
-`Authorization: Bearer <your_token_here>` (if not using cookies)
-
-#### Example 1: Update name and phone
-
-```json
-{
-  "name": "Mahesh J.",
-  "phone": "9876543210"
-}
-```
-
-#### Example 2: Update email (will overwrite the email)
-
-```json
-{
-  "email": "mahesh.jadhao@newmail.com"
-}
-```
-
-#### Example 3: Change password (requires old password)
-
-```json
-{
-  "oldPassword": "Test@1234",
-  "password": "NewPass@123"
-}
+    const data = await response.json();
+    if (response.ok) {
+      console.log("Logged out successfully");
+      localStorage.removeItem("user"); // Clear stored user data
+      // Redirect to login page
+      window.location.href = "/login";
+    } else {
+      console.error("Logout failed:", data.message);
+    }
+  } catch (error) {
+    console.error("Error during logout:", error);
+  }
+};
 ```
 
 ---
 
-### 4. Get Profile
+## Complete Frontend Auth Service Example
 
-**GET** `/api/user/profile`  
-Headers:  
-`Authorization: Bearer <your_token_here>`
+```javascript
+// auth.js - Complete authentication service
+class AuthService {
+  constructor() {
+    this.baseURL = "https://warner-and-spencer-shoes.onrender.com/api";
+  }
+
+  async register(userData) {
+    const response = await fetch(`${this.baseURL}/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(userData),
+    });
+    return await response.json();
+  }
+
+  async login(credentials) {
+    const response = await fetch(`${this.baseURL}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(credentials),
+    });
+    const data = await response.json();
+    if (response.ok) {
+      localStorage.setItem("user", JSON.stringify(data.user));
+    }
+    return data;
+  }
+
+  async getCurrentUser() {
+    const response = await fetch(`${this.baseURL}/auth/me`, {
+      credentials: "include",
+    });
+    return response.ok ? await response.json() : null;
+  }
+
+  async getUserProfile() {
+    const response = await fetch(`${this.baseURL}/user/profile`, {
+      credentials: "include",
+    });
+    return await response.json();
+  }
+
+  async updateProfile(updateData) {
+    const response = await fetch(`${this.baseURL}/user/profile`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(updateData),
+    });
+    const data = await response.json();
+    if (response.ok) {
+      localStorage.setItem("user", JSON.stringify(data.user));
+    }
+    return data;
+  }
+
+  async logout() {
+    const response = await fetch(`${this.baseURL}/auth/logout`, {
+      method: "POST",
+      credentials: "include",
+    });
+    if (response.ok) {
+      localStorage.removeItem("user");
+    }
+    return await response.json();
+  }
+
+  googleLogin() {
+    window.location.href = `${this.baseURL}/auth/google`;
+  }
+
+  isAuthenticated() {
+    return localStorage.getItem("user") !== null;
+  }
+
+  getUser() {
+    const user = localStorage.getItem("user");
+    return user ? JSON.parse(user) : null;
+  }
+}
+
+// Usage
+const authService = new AuthService();
+export default authService;
+```
+
+## Important Frontend Notes
+
+1. **Always use `credentials: 'include'`** for cookie-based authentication
+2. **Store user data in localStorage** for quick access across components
+3. **Check authentication on app load** using `/auth/me` endpoint
+4. **Handle errors gracefully** and show appropriate messages to users
+5. **Clear user data on logout** to prevent stale data
+6. **Use HTTPS** in production for secure cookie transmission
 
 ---
 
-**Note:**
-
-- Always login first to get the token.
-- Use the token in the `Authorization` header for PATCH/GET requests if not using cookies.
-- For password change, both `oldPassword` and new `password` are required.
+**Note:** Replace all `localhost:5000` references with `https://warner-and-spencer-shoes.onrender.com` for production use.
