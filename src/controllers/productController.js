@@ -6,7 +6,7 @@ const { uploadToImageKit } = require("../services/storage.service");
 // @access  Admin
 exports.addProduct = async (req, res) => {
   try {
-    const {
+    let {
       title,
       price,
       discount,
@@ -29,6 +29,21 @@ exports.addProduct = async (req, res) => {
       return res
         .status(400)
         .json({ message: "At least one image is required" });
+    }
+
+    // Parse stringified fields from multipart/form-data
+    try {
+      if (size) size = JSON.parse(size);
+      if (color) color = JSON.parse(color);
+      if (productInformation)
+        productInformation = JSON.parse(productInformation);
+    } catch (parseError) {
+      return res
+        .status(400)
+        .json({
+          message:
+            "Invalid format for size, color, or productInformation. They must be valid JSON strings.",
+        });
     }
 
     // Upload images to ImageKit
@@ -127,7 +142,7 @@ exports.getProductById = async (req, res) => {
 // @access  Admin
 exports.updateProduct = async (req, res) => {
   try {
-    const {
+    let {
       title,
       price,
       discount,
@@ -146,6 +161,21 @@ exports.updateProduct = async (req, res) => {
       return res.status(404).json({ message: "Product not found" });
     }
 
+    // Parse stringified fields from multipart/form-data if they exist
+    try {
+      if (size) size = JSON.parse(size);
+      if (color) color = JSON.parse(color);
+      if (productInformation)
+        productInformation = JSON.parse(productInformation);
+    } catch (parseError) {
+      return res
+        .status(400)
+        .json({
+          message:
+            "Invalid format for size, color, or productInformation. They must be valid JSON strings.",
+        });
+    }
+
     let imageUrls = product.img;
     if (req.files && req.files.length > 0) {
       // If new images are uploaded, upload them and replace old ones
@@ -162,15 +192,14 @@ exports.updateProduct = async (req, res) => {
     product.title = title || product.title;
     product.price = price !== undefined ? price : product.price;
     product.discount = discount !== undefined ? discount : product.discount;
-    product.size = size ? JSON.parse(size) : product.size; // Sizes might come as string
+    product.size = size || product.size;
     product.description = description || product.description;
-    product.color = color ? JSON.parse(color) : product.color; // Colors might come as string
+    product.color = color || product.color;
     product.country = country || product.country;
     product.deliveryAndReturns =
       deliveryAndReturns || product.deliveryAndReturns;
-    product.productInformation = productInformation
-      ? JSON.parse(productInformation)
-      : product.productInformation;
+    product.productInformation =
+      productInformation || product.productInformation;
     product.stock = stock !== undefined ? stock : product.stock;
 
     await product.save();
