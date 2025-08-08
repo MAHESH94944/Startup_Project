@@ -6,6 +6,14 @@ const { uploadToImageKit } = require("../services/storage.service");
 // @access  Admin
 exports.addProduct = async (req, res) => {
   try {
+    // Secure: Check for admin user
+    if (!req.user) {
+      return res.status(401).json({ message: "Not authorized, no token" });
+    }
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ message: "Access denied: Admins only" });
+    }
+
     let {
       title,
       price,
@@ -81,6 +89,14 @@ exports.addProduct = async (req, res) => {
 // @access  Admin
 exports.getAllProducts = async (req, res) => {
   try {
+    // Secure: Check for admin user
+    if (!req.user) {
+      return res.status(401).json({ message: "Not authorized, no token" });
+    }
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ message: "Access denied: Admins only" });
+    }
+
     const { page = 1, limit = 10, search, color, size } = req.query;
 
     // Build filter object
@@ -119,6 +135,14 @@ exports.getAllProducts = async (req, res) => {
 // @access  Admin
 exports.getProductById = async (req, res) => {
   try {
+    // Secure: Check for admin user
+    if (!req.user) {
+      return res.status(401).json({ message: "Not authorized, no token" });
+    }
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ message: "Access denied: Admins only" });
+    }
+
     const product = await Product.findById(req.params.id).populate(
       "createdBy",
       "name email"
@@ -140,6 +164,14 @@ exports.getProductById = async (req, res) => {
 // @access  Admin
 exports.updateProduct = async (req, res) => {
   try {
+    // Secure: Check for admin user
+    if (!req.user) {
+      return res.status(401).json({ message: "Not authorized, no token" });
+    }
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ message: "Access denied: Admins only" });
+    }
+
     let {
       title,
       price,
@@ -215,7 +247,11 @@ exports.updateProduct = async (req, res) => {
 // @access  Admin
 exports.deleteProduct = async (req, res) => {
   try {
-    if (!req.user || req.user.role !== "admin") {
+    // Secure: Check for admin user
+    if (!req.user) {
+      return res.status(401).json({ message: "Not authorized, no token" });
+    }
+    if (req.user.role !== "admin") {
       return res.status(403).json({ message: "Access denied: Admins only" });
     }
 
