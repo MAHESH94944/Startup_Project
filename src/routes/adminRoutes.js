@@ -16,7 +16,7 @@ const router = express.Router();
 router.use(authMiddleware, adminCheck);
 
 // Admin Product Routes
-router.post("/products", upload.array("img", 5), addProduct); // Handle up to 5 images
+router.post("/products", upload.array("img", 5), addProduct); // 'img' is the key for files
 router.get("/products", getAllProducts);
 router.get("/products/:id", getProductById);
 router.put("/products/:id", upload.array("img", 5), updateProduct); // Handle up to 5 images

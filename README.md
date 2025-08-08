@@ -6,859 +6,171 @@
 
 ---
 
+## Important Notes for Frontend Team
+
+### Cold Start Handling
+
+- **First request may be slow (10-30 seconds)** due to Render's free tier cold starts.
+- **Add loading states** in your frontend and consider retry logic for failed initial requests.
+- Use the `/health` endpoint to warm up the server if needed.
+
+### Authentication
+
+- **Cookie-Based Auth**: The backend uses secure, HTTP-only cookies for session management.
+- **Include Credentials**: All frontend requests must include `credentials: 'include'` to send cookies.
+- **CORS**: CORS is enabled to allow requests from any origin with credentials.
+
+---
+
 ## API Endpoints
 
 ### Health Check
 
-**GET** `/health`
+**GET** `/health` - Use this to check if the server is awake.
 
-#### Response
-
-```json
-{
-  "status": "OK",
-  "timestamp": "2024-01-15T10:30:00.000Z"
-}
-```
+- **Success Response (200):** `{"status": "OK", "timestamp": "..."}`
 
 ---
 
-### 1. Register User
+### Authentication Endpoints
+
+#### 1. Register User
 
 **POST** `/api/auth/register`
 
-#### Request Body
+- **Body:** `{ "name": "...", "email": "...", "password": "..." }`
+- **Success (201):** `{ "message": "User registered successfully", "user": {...} }`
+- **Error (400):** `{ "message": "Email already exists" }` or validation error.
 
-```json
-{
-  "name": "John Doe",
-  "email": "john@example.com",
-  "password": "StrongPassword123!"
-}
-```
-
-#### Success Response (201)
-
-```json
-{
-  "message": "User registered successfully",
-  "user": {
-    "id": "user_id",
-    "name": "John Doe",
-    "email": "john@example.com",
-    "role": "user"
-  }
-}
-```
-
-#### Error Response (400)
-
-```json
-{
-  "message": "Password must be at least 6 characters and include uppercase, lowercase, number, and special character"
-}
-```
-
-#### Frontend Handling
-
-- Show loading spinner during request
-- On success: redirect to dashboard or show success message
-- On error: display validation errors to user
-- JWT cookie is automatically set
-
----
-
-### 2. Login User
+#### 2. Login User
 
 **POST** `/api/auth/login`
 
-#### Request Body
+- **Body:** `{ "email": "...", "password": "..." }`
+- **Success (200):** `{ "message": "Login successful", "user": {...} }`
+- **Error (400):** `{ "message": "Invalid credentials" }`
 
-```json
-{
-  "email": "john@example.com",
-  "password": "StrongPassword123!"
-}
-```
-
-#### Success Response (200)
-
-```json
-{
-  "message": "Login successful",
-  "user": {
-    "id": "user_id",
-    "name": "John Doe",
-    "email": "john@example.com",
-    "role": "user"
-  }
-}
-```
-
-#### Error Response (400)
-
-```json
-{
-  "message": "Invalid credentials"
-}
-```
-
-#### Frontend Handling
-
-- Show loading spinner during request
-- On success: store user data in localStorage, redirect to dashboard
-- On error: show "Invalid email or password" message
-- Handle server cold starts with retry logic
-
----
-
-### 3. Google OAuth Login
+#### 3. Google OAuth Login
 
 **GET** `/api/auth/google`
 
-#### Usage
+- **Usage:** Redirect the user to this URL. After Google login, the user will see a JSON response with a `token` and `user` object. The frontend should handle this response to complete the login process.
 
-- Redirect user to this URL for Google login
-- Google handles authentication
-- User redirected back with JWT cookie set
-
-#### Success Response (after callback)
-
-```json
-{
-  "message": "Login successful",
-  "token": "jwt_token_here",
-  "user": {
-    "_id": "user_id",
-    "name": "Google User Name",
-    "email": "user@gmail.com",
-    "role": "user",
-    "provider": "google",
-    "googleId": "google_user_id"
-  }
-}
-```
-
-#### Frontend Handling
-
-- Add "Login with Google" button that redirects to the endpoint
-- After successful login, user sees JSON response with token
-- Extract user data and store in localStorage
-
----
-
-### 4. Get Current User
+#### 4. Get Current User
 
 **GET** `/api/auth/me`
 
-#### Headers
+- **Headers:** Requires authentication cookie.
+- **Success (200):** `{ "user": {...} }`
+- **Error (401):** `{ "message": "Not authorized, no token" }`
 
-- Requires JWT cookie (automatically sent)
-
-#### Success Response (200)
-
-```json
-{
-  "user": {
-    "id": "user_id",
-    "name": "John Doe",
-    "email": "john@example.com",
-    "role": "user"
-  }
-}
-```
-
-#### Error Response (401)
-
-```json
-{
-  "message": "Not authorized, no token"
-}
-```
-
-#### Frontend Handling
-
-- Use on app initialization to check if user is logged in
-- If 401 error: redirect to login page
-- If success: set user as authenticated
-
----
-
-### 5. Get User Profile
-
-**GET** `/api/user/profile`
-
-#### Headers
-
-- Requires JWT cookie (automatically sent)
-
-#### Success Response (200)
-
-```json
-{
-  "user": {
-    "id": "user_id",
-    "name": "John Doe",
-    "email": "john@example.com",
-    "role": "user",
-    "phone": "9876543210",
-    "provider": "local",
-    "googleId": null,
-    "createdAt": "2024-01-15T10:30:00.000Z",
-    "updatedAt": "2024-01-15T10:30:00.000Z"
-  }
-}
-```
-
-#### Error Response (401)
-
-```json
-{
-  "message": "Unauthorized: No user logged in"
-}
-```
-
-#### Frontend Handling
-
-- Use for profile page to show detailed user information
-- Display all user fields in profile form
-- Handle loading states
-
----
-
-### 6. Update User Profile
-
-**PATCH** `/api/user/profile`
-
-#### Headers
-
-- Requires JWT cookie (automatically sent)
-
-#### Request Body (any combination)
-
-```json
-{
-  "name": "New Name",
-  "email": "newemail@example.com",
-  "phone": "9999999999",
-  "password": "NewPassword123!",
-  "oldPassword": "CurrentPassword123!"
-}
-```
-
-#### Success Response (200)
-
-```json
-{
-  "message": "Profile updated successfully",
-  "user": {
-    "id": "user_id",
-    "name": "New Name",
-    "email": "newemail@example.com",
-    "role": "user",
-    "phone": "9999999999",
-    "provider": "local",
-    "googleId": null,
-    "createdAt": "2024-01-15T10:30:00.000Z",
-    "updatedAt": "2024-01-15T11:00:00.000Z"
-  }
-}
-```
-
-#### Error Responses
-
-```json
-// Password change for social login users
-{
-  "message": "You cannot change password for social login account"
-}
-
-// Wrong old password
-{
-  "message": "Old password incorrect"
-}
-
-// Email already exists
-{
-  "message": "Email already exists"
-}
-
-// Weak password
-{
-  "message": "Password must be at least 6 characters and include uppercase, lowercase, number, and special character"
-}
-```
-
-#### Frontend Handling
-
-- Create profile edit form with individual field updates
-- For password change: require old password field
-- Show success message on update
-- Update localStorage with new user data
-- Handle specific error messages
-
----
-
-### 7. Logout User
+#### 5. Logout User
 
 **POST** `/api/auth/logout`
 
-#### Headers
-
-- Requires JWT cookie (automatically sent)
-
-#### Success Response (200)
-
-```json
-{
-  "message": "Logged out successfully"
-}
-```
-
-#### Frontend Handling
-
-- Call on logout button click
-- Clear localStorage user data
-- Redirect to login page
-- Show "Logged out successfully" message
+- **Headers:** Requires authentication cookie.
+- **Success (200):** `{ "message": "Logged out successfully" }`
 
 ---
 
-## Admin Product Endpoints
+### User Profile Endpoints
 
-### 1. Add a New Product
+#### 1. Get User Profile
+
+**GET** `/api/user/profile`
+
+- **Headers:** Requires authentication cookie.
+- **Success (200):** `{ "user": {...} }` (Returns full user profile).
+
+#### 2. Update User Profile
+
+**PATCH** `/api/user/profile`
+
+- **Headers:** Requires authentication cookie.
+- **Body:** `{ "name": "...", "phone": "...", "oldPassword": "...", "password": "..." }` (any combination).
+- **Success (200):** `{ "message": "Profile updated successfully", "user": {...} }`
+- **Error (400):** For incorrect old password, social login password change attempt, etc.
+
+---
+
+### Admin Product Endpoints
+
+_All admin routes require admin-level authentication._
+
+#### 1. Add a New Product
 
 **POST** `/api/admin/products`
 
-#### Headers
+- **Headers:** `Content-Type: multipart/form-data` (Postman sets this automatically when you use form-data).
+- **Body (form-data):**
+  - `img`: (File) One or more image files.
+  - `title`: (Text) "Premium Leather Shoes"
+  - `price`: (Text) 4999
+  - `stock`: (Text) 100
+  - `size`: (Text) `[8,9,10]` **(Must be a valid JSON array string)**
+  - `color`: (Text) `["Black","Brown"]` **(Must be a valid JSON array string)**
+  - `productInformation`: (Text) `{"material":"Leather","care":"Wipe clean"}` **(Must be a valid JSON object string)**
+  - ... other text fields
 
-- Requires admin authentication
-- `Content-Type`: `multipart/form-data`
+#### How to Test with Postman (form-data)
 
-#### Request Body (form-data)
+The "unexpected end of file" error happens because you must send this request as `multipart/form-data`, not as raw JSON, when uploading files.
 
-- `img`: (File) One or more image files (up to 5).
-- `title`: (Text) "Premium Leather Shoes"
-- `price`: (Text) 4999
-- `discount`: (Text) 10
-- `size`: (Text) `[8, 9, 10]`
-- `description`: (Text) "Handcrafted premium leather shoes..."
-- `color`: (Text) `["Black", "Brown"]`
-- `country`: (Text) "India"
-- `deliveryAndReturns`: (Text) "Free delivery and 30-day returns."
-- `productInformation`: (Text) `{"material": "100% Genuine Leather", "care": "Wipe with a clean, dry cloth."}`
-- `stock`: (Text) 100
+1.  In Postman, set the request method to **POST**.
+2.  Go to the **Body** tab and select **form-data**.
+3.  Add your fields as key-value pairs:
+    - For **text fields** (`title`, `price`, etc.), enter the key and its value.
+    - For **array/object fields** (`size`, `color`, `productInformation`), enter the key and a **valid JSON string** as the value.
+    - For **image files**, enter the key (`img`), and in the value column, click the dropdown and select **File**. Then you can choose the image(s) from your computer.
 
-#### Success Response (201)
+**Example Postman Setup:**
 
-```json
-{
-  "message": "Product created successfully",
-  "product": {
-    "_id": "product_id",
-    "img": ["https://example.com/image1.jpg"],
-    "title": "Premium Leather Shoes",
-    "price": 4999,
-    "discount": 10,
-    "size": [8, 9, 10],
-    "description": "Handcrafted premium leather shoes for all occasions.",
-    "color": ["Black", "Brown"],
-    "country": "India",
-    "deliveryAndReturns": "Free delivery and 30-day returns.",
-    "productInformation": {
-      "material": "100% Genuine Leather",
-      "care": "Wipe with a clean, dry cloth."
-    },
-    "stock": 100,
-    "createdBy": "admin_user_id",
-    "createdAt": "...",
-    "updatedAt": "..."
-  }
-}
-```
+| KEY                  | VALUE                                                      |
+| -------------------- | ---------------------------------------------------------- |
+| `img`                | (File) `shoe1.jpg`                                         |
+| `img`                | (File) `shoe2.jpg`                                         |
+| `title`              | `Classic Leather Loafers`                                  |
+| `price`              | `3500`                                                     |
+| `stock`              | `50`                                                       |
+| `size`               | `[8, 9, 10]`                                               |
+| `color`              | `["Tan", "Black"]`                                         |
+| `productInformation` | `{"material": "Full-grain leather", "care": "Use polish"}` |
 
 ---
 
-### 2. Get All Products
+#### 2. Get All Products
 
 **GET** `/api/admin/products`
 
-#### Headers
+- **Query Params (optional):** `page`, `limit`, `search`, `color`, `size`.
+- **Success (200):** `{ "products": [...], "totalPages": ..., "currentPage": ..., "total": ... }`
 
-- Requires admin authentication
-
-#### Query Parameters (optional)
-
-- `page`: Page number (default: 1)
-- `limit`: Items per page (default: 10)
-- `search`: Search by title or description
-- `color`: Filter by color
-- `size`: Filter by size
-
-#### Success Response (200)
-
-```json
-{
-  "products": [
-    {
-      "_id": "product_id",
-      "title": "Premium Leather Shoes",
-      "price": 4999,
-      "stock": 100
-    }
-  ],
-  "totalPages": 1,
-  "currentPage": 1,
-  "total": 1
-}
-```
-
----
-
-### 3. Get Single Product by ID
+#### 3. Get Single Product by ID
 
 **GET** `/api/admin/products/:id`
 
-#### Headers
+- **Success (200):** `{ "product": {...} }`
 
-- Requires admin authentication
-
-#### Success Response (200)
-
-```json
-{
-  "product": {
-    "_id": "product_id",
-    "title": "Premium Leather Shoes",
-    "price": 4999,
-    "stock": 100,
-    "description": "..."
-  }
-}
-```
-
----
-
-### 4. Update Product
+#### 4. Update Product
 
 **PUT** `/api/admin/products/:id`
 
-#### Headers
+- **Headers:** `Content-Type: multipart/form-data`
+- **Body (form-data):** Any fields to update. If you are sending new images, they will replace the old ones. The same rules for JSON strings apply here.
+- **Success (200):** `{ "message": "Product updated successfully", "product": {...} }`
 
-- Requires admin authentication
-- `Content-Type`: `multipart/form-data`
-
-#### Request Body (form-data, any fields to update)
-
-- `img`: (File) Optional new image files to replace old ones.
-- `price`: (Text) 4500
-- `stock`: (Text) 90
-
-#### Success Response (200)
-
-```json
-{
-  "message": "Product updated successfully",
-  "product": {
-    "_id": "product_id",
-    "price": 4500,
-    "stock": 90
-  }
-}
-```
-
----
-
-### 5. Delete Product
+#### 5. Delete Product
 
 **DELETE** `/api/admin/products/:id`
 
-#### Headers
-
-- Requires admin authentication
-
-#### Success Response (200)
-
-```json
-{
-  "message": "Product deleted successfully"
-}
-```
+- **Success (200):** `{ "message": "Product deleted successfully" }`
 
 ---
 
-## User Endpoints
-
-### 1. Register User
-
-**POST** `/api/auth/register`
-
-#### Request Body
-
-```json
-{
-  "name": "John Doe",
-  "email": "john@example.com",
-  "password": "StrongPassword123!"
-}
-```
-
-#### Success Response (201)
-
-```json
-{
-  "message": "User registered successfully",
-  "user": {
-    "id": "user_id",
-    "name": "John Doe",
-    "email": "john@example.com",
-    "role": "user"
-  }
-}
-```
-
-#### Error Response (400)
-
-```json
-{
-  "message": "Password must be at least 6 characters and include uppercase, lowercase, number, and special character"
-}
-```
-
-#### Frontend Handling
-
-- Show loading spinner during request
-- On success: redirect to dashboard or show success message
-- On error: display validation errors to user
-- JWT cookie is automatically set
-
----
-
-### 2. Login User
-
-**POST** `/api/auth/login`
-
-#### Request Body
-
-```json
-{
-  "email": "john@example.com",
-  "password": "StrongPassword123!"
-}
-```
-
-#### Success Response (200)
-
-```json
-{
-  "message": "Login successful",
-  "user": {
-    "id": "user_id",
-    "name": "John Doe",
-    "email": "john@example.com",
-    "role": "user"
-  }
-}
-```
-
-#### Error Response (400)
-
-```json
-{
-  "message": "Invalid credentials"
-}
-```
-
-#### Frontend Handling
-
-- Show loading spinner during request
-- On success: store user data in localStorage, redirect to dashboard
-- On error: show "Invalid email or password" message
-- Handle server cold starts with retry logic
-
----
-
-### 3. Google OAuth Login
-
-**GET** `/api/auth/google`
-
-#### Usage
-
-- Redirect user to this URL for Google login
-- Google handles authentication
-- User redirected back with JWT cookie set
-
-#### Success Response (after callback)
-
-```json
-{
-  "message": "Login successful",
-  "token": "jwt_token_here",
-  "user": {
-    "_id": "user_id",
-    "name": "Google User Name",
-    "email": "user@gmail.com",
-    "role": "user",
-    "provider": "google",
-    "googleId": "google_user_id"
-  }
-}
-```
-
-#### Frontend Handling
-
-- Add "Login with Google" button that redirects to the endpoint
-- After successful login, user sees JSON response with token
-- Extract user data and store in localStorage
-
----
-
-### 4. Get Current User
-
-**GET** `/api/auth/me`
-
-#### Headers
-
-- Requires JWT cookie (automatically sent)
-
-#### Success Response (200)
-
-```json
-{
-  "user": {
-    "id": "user_id",
-    "name": "John Doe",
-    "email": "john@example.com",
-    "role": "user"
-  }
-}
-```
-
-#### Error Response (401)
-
-```json
-{
-  "message": "Not authorized, no token"
-}
-```
-
-#### Frontend Handling
-
-- Use on app initialization to check if user is logged in
-- If 401 error: redirect to login page
-- If success: set user as authenticated
-
----
-
-### 5. Get User Profile
-
-**GET** `/api/user/profile`
-
-#### Headers
-
-- Requires JWT cookie (automatically sent)
-
-#### Success Response (200)
-
-```json
-{
-  "user": {
-    "id": "user_id",
-    "name": "John Doe",
-    "email": "john@example.com",
-    "role": "user",
-    "phone": "9876543210",
-    "provider": "local",
-    "googleId": null,
-    "createdAt": "2024-01-15T10:30:00.000Z",
-    "updatedAt": "2024-01-15T10:30:00.000Z"
-  }
-}
-```
-
-#### Error Response (401)
-
-```json
-{
-  "message": "Unauthorized: No user logged in"
-}
-```
-
-#### Frontend Handling
-
-- Use for profile page to show detailed user information
-- Display all user fields in profile form
-- Handle loading states
-
----
-
-### 6. Update User Profile
-
-**PATCH** `/api/user/profile`
-
-#### Headers
-
-- Requires JWT cookie (automatically sent)
-
-#### Request Body (any combination)
-
-```json
-{
-  "name": "New Name",
-  "email": "newemail@example.com",
-  "phone": "9999999999",
-  "password": "NewPassword123!",
-  "oldPassword": "CurrentPassword123!"
-}
-```
-
-#### Success Response (200)
-
-```json
-{
-  "message": "Profile updated successfully",
-  "user": {
-    "id": "user_id",
-    "name": "New Name",
-    "email": "newemail@example.com",
-    "role": "user",
-    "phone": "9999999999",
-    "provider": "local",
-    "googleId": null,
-    "createdAt": "2024-01-15T10:30:00.000Z",
-    "updatedAt": "2024-01-15T11:00:00.000Z"
-  }
-}
-```
-
-#### Error Responses
-
-```json
-// Password change for social login users
-{
-  "message": "You cannot change password for social login account"
-}
-
-// Wrong old password
-{
-  "message": "Old password incorrect"
-}
-
-// Email already exists
-{
-  "message": "Email already exists"
-}
-
-// Weak password
-{
-  "message": "Password must be at least 6 characters and include uppercase, lowercase, number, and special character"
-}
-```
-
-#### Frontend Handling
-
-- Create profile edit form with individual field updates
-- For password change: require old password field
-- Show success message on update
-- Update localStorage with new user data
-- Handle specific error messages
-
----
-
-### 7. Logout User
-
-**POST** `/api/auth/logout`
-
-#### Headers
-
-- Requires JWT cookie (automatically sent)
-
-#### Success Response (200)
-
-```json
-{
-  "message": "Logged out successfully"
-}
-```
-
-#### Frontend Handling
-
-- Call on logout button click
-- Clear localStorage user data
-- Redirect to login page
-- Show "Logged out successfully" message
-
----
-
-## Frontend Integration Guide
-
-### Essential Request Configuration
-
-```javascript
-// Always include credentials for cookie-based auth
-fetch(url, {
-  credentials: "include",
-  headers: {
-    "Content-Type": "application/json",
-  },
-});
-```
-
-### Error Handling Best Practices
-
-```javascript
-// Handle different error types
-if (response.status === 401) {
-  // Redirect to login
-  localStorage.removeItem("user");
-  window.location.href = "/login";
-} else if (response.status === 400) {
-  // Show validation error
-  const data = await response.json();
-  showErrorMessage(data.message);
-} else if (response.status === 503) {
-  // Server cold start - retry
-  setTimeout(() => retryRequest(), 3000);
-}
-```
-
-### Loading States
-
-- Show spinners during API calls
-- Disable submit buttons while processing
-- Handle server cold start delays (up to 30 seconds)
-
-### Authentication Flow
-
-1. **App Load**: Call `/api/auth/me` to check if user is logged in
-2. **Login**: Call `/api/auth/login` and store user data
-3. **Protected Routes**: Check localStorage for user data
-4. **Logout**: Call `/api/auth/logout` and clear data
-
-### Data Storage
-
-- Store user info in `localStorage` for persistence
-- Update localStorage after profile updates
-- Clear localStorage on logout or 401 errors
-
----
-
-## Important Notes
-
-- **Cold Starts**: First request may take 10-30 seconds on free tier
-- **Cookies**: JWT tokens are HTTP-only cookies, handled automatically
-- **CORS**: Configured to allow all origins with credentials
-- **Security**: Passwords are hashed, sensitive data is protected
-- **Validation**: Strong password requirements enforced
-- **Error Messages**: User-friendly error responses provided
-
-**🚀 Backend is production-ready and fully tested!**
-
-- **Cold Starts**: First request may take 10-30 seconds on free tier
-- **Cookies**: JWT tokens are HTTP-only cookies, handled automatically
-- **CORS**: Configured to allow all origins with credentials
-- **Security**: Passwords are hashed, sensitive data is protected
-- **Validation**: Strong password requirements enforced
-- **Error Messages**: User-friendly error responses provided
+## Running the Project Locally
+
+1. Create a `.env` file based on the provided variables.
+2. Run `npm install` to install dependencies.
+3. Run `npm start` to start the server.
 
 **🚀 Backend is production-ready and fully tested!**

@@ -38,12 +38,10 @@ exports.addProduct = async (req, res) => {
       if (productInformation)
         productInformation = JSON.parse(productInformation);
     } catch (parseError) {
-      return res
-        .status(400)
-        .json({
-          message:
-            "Invalid format for size, color, or productInformation. They must be valid JSON strings.",
-        });
+      return res.status(400).json({
+        message:
+          "Invalid format for size, color, or productInformation. They must be valid JSON strings.",
+      });
     }
 
     // Upload images to ImageKit
@@ -168,12 +166,10 @@ exports.updateProduct = async (req, res) => {
       if (productInformation)
         productInformation = JSON.parse(productInformation);
     } catch (parseError) {
-      return res
-        .status(400)
-        .json({
-          message:
-            "Invalid format for size, color, or productInformation. They must be valid JSON strings.",
-        });
+      return res.status(400).json({
+        message:
+          "Invalid format for size, color, or productInformation. They must be valid JSON strings.",
+      });
     }
 
     let imageUrls = product.img;
