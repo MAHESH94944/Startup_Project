@@ -1,6 +1,44 @@
 const Product = require("../models/Product");
 const { uploadToImageKit } = require("../services/storage.service");
 
+// Helper function to parse form-data fields
+const parseProductData = (body) => {
+  const {
+    title,
+    price,
+    discount,
+    description,
+    country,
+    deliveryAndReturns,
+    stock,
+  } = body;
+
+  let { size, color, productInformation } = body;
+
+  try {
+    if (size) size = JSON.parse(size);
+    if (color) color = JSON.parse(color);
+    if (productInformation) productInformation = JSON.parse(productInformation);
+  } catch (e) {
+    throw new Error(
+      "Invalid JSON format for size, color, or productInformation."
+    );
+  }
+
+  return {
+    title,
+    price,
+    discount,
+    size,
+    description,
+    color,
+    country,
+    deliveryAndReturns,
+    productInformation,
+    stock,
+  };
+};
+
 // @desc    Add a new product (admin only)
 // @route   POST /api/admin/products
 // @access  Admin
@@ -14,20 +52,9 @@ exports.addProduct = async (req, res) => {
       return res.status(403).json({ message: "Access denied: Admins only" });
     }
 
-    let {
-      title,
-      price,
-      discount,
-      size,
-      description,
-      color,
-      country,
-      deliveryAndReturns,
-      productInformation,
-      stock,
-    } = req.body;
+    const productData = parseProductData(req.body);
 
-    if (!title || !price || !description) {
+    if (!productData.title || !productData.price || !productData.description) {
       return res
         .status(400)
         .json({ message: "Title, price, and description are required" });
@@ -39,36 +66,14 @@ exports.addProduct = async (req, res) => {
         .json({ message: "At least one image is required" });
     }
 
-    // Parse stringified fields from multipart/form-data
-    try {
-      if (size) size = JSON.parse(size);
-      if (color) color = JSON.parse(color);
-      if (productInformation)
-        productInformation = JSON.parse(productInformation);
-    } catch (parseError) {
-      return res.status(400).json({
-        message:
-          "Invalid format for size, color, or productInformation. They must be valid JSON strings.",
-      });
-    }
-
     // Upload images to ImageKit
     const imageUploadPromises = req.files.map((file) => uploadToImageKit(file));
     const uploadedImages = await Promise.all(imageUploadPromises);
     const imageUrls = uploadedImages.map((result) => result.url);
 
     const product = new Product({
+      ...productData,
       img: imageUrls,
-      title,
-      price,
-      discount,
-      size,
-      description,
-      color,
-      country,
-      deliveryAndReturns,
-      productInformation,
-      stock,
       createdBy: req.user._id,
     });
 
@@ -80,6 +85,9 @@ exports.addProduct = async (req, res) => {
     });
   } catch (error) {
     console.error("Error adding product:", error);
+    if (error.message.includes("Invalid JSON format")) {
+      return res.status(400).json({ message: error.message });
+    }
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -172,37 +180,13 @@ exports.updateProduct = async (req, res) => {
       return res.status(403).json({ message: "Access denied: Admins only" });
     }
 
-    let {
-      title,
-      price,
-      discount,
-      size,
-      description,
-      color,
-      country,
-      deliveryAndReturns,
-      productInformation,
-      stock,
-    } = req.body;
-
     const product = await Product.findById(req.params.id);
 
     if (!product) {
       return res.status(404).json({ message: "Product not found" });
     }
 
-    // Parse stringified fields from multipart/form-data if they exist
-    try {
-      if (size) size = JSON.parse(size);
-      if (color) color = JSON.parse(color);
-      if (productInformation)
-        productInformation = JSON.parse(productInformation);
-    } catch (parseError) {
-      return res.status(400).json({
-        message:
-          "Invalid format for size, color, or productInformation. They must be valid JSON strings.",
-      });
-    }
+    const productData = parseProductData(req.body);
 
     let imageUrls = product.img;
     if (req.files && req.files.length > 0) {
@@ -217,18 +201,7 @@ exports.updateProduct = async (req, res) => {
 
     // Update fields
     product.img = imageUrls;
-    product.title = title || product.title;
-    product.price = price !== undefined ? price : product.price;
-    product.discount = discount !== undefined ? discount : product.discount;
-    product.size = size || product.size;
-    product.description = description || product.description;
-    product.color = color || product.color;
-    product.country = country || product.country;
-    product.deliveryAndReturns =
-      deliveryAndReturns || product.deliveryAndReturns;
-    product.productInformation =
-      productInformation || product.productInformation;
-    product.stock = stock !== undefined ? stock : product.stock;
+    Object.assign(product, productData);
 
     await product.save();
 
@@ -238,11 +211,40 @@ exports.updateProduct = async (req, res) => {
     });
   } catch (error) {
     console.error("Error updating product:", error);
+    if (error.message.includes("Invalid JSON format")) {
+      return res.status(400).json({ message: error.message });
+    }
     res.status(500).json({ message: "Server error" });
   }
 };
 
 // @desc    Delete product (admin only)
+// @route   DELETE /api/admin/products/:id
+// @access  Admin
+exports.deleteProduct = async (req, res) => {
+  try {
+    // Secure: Check for admin user
+    if (!req.user) {
+      return res.status(401).json({ message: "Not authorized, no token" });
+    }
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ message: "Access denied: Admins only" });
+    }
+
+    const product = await Product.findById(req.params.id);
+
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    await Product.findByIdAndDelete(req.params.id);
+
+    res.status(200).json({ message: "Product deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting product:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
 // @route   DELETE /api/admin/products/:id
 // @access  Admin
 exports.deleteProduct = async (req, res) => {
