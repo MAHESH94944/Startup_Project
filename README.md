@@ -333,27 +333,21 @@
 #### Headers
 
 - Requires admin authentication
+- `Content-Type`: `multipart/form-data`
 
-#### Request Body
+#### Request Body (form-data)
 
-```json
-{
-  "img": ["https://example.com/image1.jpg"],
-  "title": "Premium Leather Shoes",
-  "price": 4999,
-  "discount": 10,
-  "size": [8, 9, 10],
-  "description": "Handcrafted premium leather shoes for all occasions.",
-  "color": ["Black", "Brown"],
-  "country": "India",
-  "deliveryAndReturns": "Free delivery and 30-day returns.",
-  "productInformation": {
-    "material": "100% Genuine Leather",
-    "care": "Wipe with a clean, dry cloth."
-  },
-  "stock": 100
-}
-```
+- `img`: (File) One or more image files (up to 5).
+- `title`: (Text) "Premium Leather Shoes"
+- `price`: (Text) 4999
+- `discount`: (Text) 10
+- `size`: (Text) `[8, 9, 10]`
+- `description`: (Text) "Handcrafted premium leather shoes..."
+- `color`: (Text) `["Black", "Brown"]`
+- `country`: (Text) "India"
+- `deliveryAndReturns`: (Text) "Free delivery and 30-day returns."
+- `productInformation`: (Text) `{"material": "100% Genuine Leather", "care": "Wipe with a clean, dry cloth."}`
+- `stock`: (Text) 100
 
 #### Success Response (201)
 
@@ -452,15 +446,13 @@
 #### Headers
 
 - Requires admin authentication
+- `Content-Type`: `multipart/form-data`
 
-#### Request Body (any fields to update)
+#### Request Body (form-data, any fields to update)
 
-```json
-{
-  "price": 4500,
-  "stock": 90
-}
-```
+- `img`: (File) Optional new image files to replace old ones.
+- `price`: (Text) 4500
+- `stock`: (Text) 90
 
 #### Success Response (200)
 
@@ -852,6 +844,15 @@ if (response.status === 401) {
 ---
 
 ## Important Notes
+
+- **Cold Starts**: First request may take 10-30 seconds on free tier
+- **Cookies**: JWT tokens are HTTP-only cookies, handled automatically
+- **CORS**: Configured to allow all origins with credentials
+- **Security**: Passwords are hashed, sensitive data is protected
+- **Validation**: Strong password requirements enforced
+- **Error Messages**: User-friendly error responses provided
+
+**🚀 Backend is production-ready and fully tested!**
 
 - **Cold Starts**: First request may take 10-30 seconds on free tier
 - **Cookies**: JWT tokens are HTTP-only cookies, handled automatically

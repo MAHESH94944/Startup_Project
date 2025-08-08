@@ -1,4 +1,5 @@
 const Product = require("../models/Product");
+const { uploadToImageKit } = require("../services/storage.service");
 
 // @desc    Add a new product (admin only)
 // @route   POST /api/admin/products
@@ -6,7 +7,6 @@ const Product = require("../models/Product");
 exports.addProduct = async (req, res) => {
   try {
     const {
-      img,
       title,
       price,
       discount,
@@ -25,8 +25,19 @@ exports.addProduct = async (req, res) => {
         .json({ message: "Title, price, and description are required" });
     }
 
+    if (!req.files || req.files.length === 0) {
+      return res
+        .status(400)
+        .json({ message: "At least one image is required" });
+    }
+
+    // Upload images to ImageKit
+    const imageUploadPromises = req.files.map((file) => uploadToImageKit(file));
+    const uploadedImages = await Promise.all(imageUploadPromises);
+    const imageUrls = uploadedImages.map((result) => result.url);
+
     const product = new Product({
-      img,
+      img: imageUrls,
       title,
       price,
       discount,
@@ -117,7 +128,6 @@ exports.getProductById = async (req, res) => {
 exports.updateProduct = async (req, res) => {
   try {
     const {
-      img,
       title,
       price,
       discount,
@@ -136,19 +146,31 @@ exports.updateProduct = async (req, res) => {
       return res.status(404).json({ message: "Product not found" });
     }
 
-    // Update all fields
-    product.img = img || product.img;
+    let imageUrls = product.img;
+    if (req.files && req.files.length > 0) {
+      // If new images are uploaded, upload them and replace old ones
+      const imageUploadPromises = req.files.map((file) =>
+        uploadToImageKit(file)
+      );
+      const uploadedImages = await Promise.all(imageUploadPromises);
+      imageUrls = uploadedImages.map((result) => result.url);
+      // TODO: Optionally delete old images from ImageKit
+    }
+
+    // Update fields
+    product.img = imageUrls;
     product.title = title || product.title;
     product.price = price !== undefined ? price : product.price;
     product.discount = discount !== undefined ? discount : product.discount;
-    product.size = size || product.size;
+    product.size = size ? JSON.parse(size) : product.size; // Sizes might come as string
     product.description = description || product.description;
-    product.color = color || product.color;
+    product.color = color ? JSON.parse(color) : product.color; // Colors might come as string
     product.country = country || product.country;
     product.deliveryAndReturns =
       deliveryAndReturns || product.deliveryAndReturns;
-    product.productInformation =
-      productInformation || product.productInformation;
+    product.productInformation = productInformation
+      ? JSON.parse(productInformation)
+      : product.productInformation;
     product.stock = stock !== undefined ? stock : product.stock;
 
     await product.save();

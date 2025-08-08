@@ -8,6 +8,7 @@ const {
 } = require("../controllers/productController");
 const authMiddleware = require("../middleware/authMiddleware");
 const adminCheck = require("../middleware/adminCheck");
+const upload = require("../middleware/multer.middleware");
 
 const router = express.Router();
 
@@ -15,10 +16,10 @@ const router = express.Router();
 router.use(authMiddleware, adminCheck);
 
 // Admin Product Routes
-router.post("/products", addProduct);
+router.post("/products", upload.array("img", 5), addProduct); // Handle up to 5 images
 router.get("/products", getAllProducts);
 router.get("/products/:id", getProductById);
-router.put("/products/:id", updateProduct);
+router.put("/products/:id", upload.array("img", 5), updateProduct); // Handle up to 5 images
 router.delete("/products/:id", deleteProduct);
 
 module.exports = router;
