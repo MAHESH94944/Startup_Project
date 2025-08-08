@@ -1,4 +1,5 @@
 const ImageKit = require("imagekit");
+const mongoose = require("mongoose");
 
 const imagekit = new ImageKit({
   publicKey: process.env.IMAGE_KIT_PUBLIC_KEY,
@@ -10,7 +11,7 @@ const uploadToImageKit = async (file) => {
   try {
     const result = await imagekit.upload({
       file: file.buffer,
-      fileName: file.originalname,
+      fileName:  new mongoose.Types.ObjectId().toString(),
       folder: "products",
     });
     return result;
