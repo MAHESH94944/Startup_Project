@@ -324,6 +324,480 @@
 
 ---
 
+## Admin Product Endpoints
+
+### 1. Add a New Product
+
+**POST** `/api/admin/products`
+
+#### Headers
+
+- Requires admin authentication
+
+#### Request Body
+
+```json
+{
+  "img": ["https://example.com/image1.jpg"],
+  "title": "Premium Leather Shoes",
+  "price": 4999,
+  "discount": 10,
+  "size": [8, 9, 10],
+  "description": "Handcrafted premium leather shoes for all occasions.",
+  "color": ["Black", "Brown"],
+  "country": "India",
+  "deliveryAndReturns": "Free delivery and 30-day returns.",
+  "productInformation": {
+    "material": "100% Genuine Leather",
+    "care": "Wipe with a clean, dry cloth."
+  },
+  "stock": 100
+}
+```
+
+#### Success Response (201)
+
+```json
+{
+  "message": "Product created successfully",
+  "product": {
+    "_id": "product_id",
+    "img": ["https://example.com/image1.jpg"],
+    "title": "Premium Leather Shoes",
+    "price": 4999,
+    "discount": 10,
+    "size": [8, 9, 10],
+    "description": "Handcrafted premium leather shoes for all occasions.",
+    "color": ["Black", "Brown"],
+    "country": "India",
+    "deliveryAndReturns": "Free delivery and 30-day returns.",
+    "productInformation": {
+      "material": "100% Genuine Leather",
+      "care": "Wipe with a clean, dry cloth."
+    },
+    "stock": 100,
+    "createdBy": "admin_user_id",
+    "createdAt": "...",
+    "updatedAt": "..."
+  }
+}
+```
+
+---
+
+### 2. Get All Products
+
+**GET** `/api/admin/products`
+
+#### Headers
+
+- Requires admin authentication
+
+#### Query Parameters (optional)
+
+- `page`: Page number (default: 1)
+- `limit`: Items per page (default: 10)
+- `search`: Search by title or description
+- `color`: Filter by color
+- `size`: Filter by size
+
+#### Success Response (200)
+
+```json
+{
+  "products": [
+    {
+      "_id": "product_id",
+      "title": "Premium Leather Shoes",
+      "price": 4999,
+      "stock": 100
+    }
+  ],
+  "totalPages": 1,
+  "currentPage": 1,
+  "total": 1
+}
+```
+
+---
+
+### 3. Get Single Product by ID
+
+**GET** `/api/admin/products/:id`
+
+#### Headers
+
+- Requires admin authentication
+
+#### Success Response (200)
+
+```json
+{
+  "product": {
+    "_id": "product_id",
+    "title": "Premium Leather Shoes",
+    "price": 4999,
+    "stock": 100,
+    "description": "..."
+  }
+}
+```
+
+---
+
+### 4. Update Product
+
+**PUT** `/api/admin/products/:id`
+
+#### Headers
+
+- Requires admin authentication
+
+#### Request Body (any fields to update)
+
+```json
+{
+  "price": 4500,
+  "stock": 90
+}
+```
+
+#### Success Response (200)
+
+```json
+{
+  "message": "Product updated successfully",
+  "product": {
+    "_id": "product_id",
+    "price": 4500,
+    "stock": 90
+  }
+}
+```
+
+---
+
+### 5. Delete Product
+
+**DELETE** `/api/admin/products/:id`
+
+#### Headers
+
+- Requires admin authentication
+
+#### Success Response (200)
+
+```json
+{
+  "message": "Product deleted successfully"
+}
+```
+
+---
+
+## User Endpoints
+
+### 1. Register User
+
+**POST** `/api/auth/register`
+
+#### Request Body
+
+```json
+{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "password": "StrongPassword123!"
+}
+```
+
+#### Success Response (201)
+
+```json
+{
+  "message": "User registered successfully",
+  "user": {
+    "id": "user_id",
+    "name": "John Doe",
+    "email": "john@example.com",
+    "role": "user"
+  }
+}
+```
+
+#### Error Response (400)
+
+```json
+{
+  "message": "Password must be at least 6 characters and include uppercase, lowercase, number, and special character"
+}
+```
+
+#### Frontend Handling
+
+- Show loading spinner during request
+- On success: redirect to dashboard or show success message
+- On error: display validation errors to user
+- JWT cookie is automatically set
+
+---
+
+### 2. Login User
+
+**POST** `/api/auth/login`
+
+#### Request Body
+
+```json
+{
+  "email": "john@example.com",
+  "password": "StrongPassword123!"
+}
+```
+
+#### Success Response (200)
+
+```json
+{
+  "message": "Login successful",
+  "user": {
+    "id": "user_id",
+    "name": "John Doe",
+    "email": "john@example.com",
+    "role": "user"
+  }
+}
+```
+
+#### Error Response (400)
+
+```json
+{
+  "message": "Invalid credentials"
+}
+```
+
+#### Frontend Handling
+
+- Show loading spinner during request
+- On success: store user data in localStorage, redirect to dashboard
+- On error: show "Invalid email or password" message
+- Handle server cold starts with retry logic
+
+---
+
+### 3. Google OAuth Login
+
+**GET** `/api/auth/google`
+
+#### Usage
+
+- Redirect user to this URL for Google login
+- Google handles authentication
+- User redirected back with JWT cookie set
+
+#### Success Response (after callback)
+
+```json
+{
+  "message": "Login successful",
+  "token": "jwt_token_here",
+  "user": {
+    "_id": "user_id",
+    "name": "Google User Name",
+    "email": "user@gmail.com",
+    "role": "user",
+    "provider": "google",
+    "googleId": "google_user_id"
+  }
+}
+```
+
+#### Frontend Handling
+
+- Add "Login with Google" button that redirects to the endpoint
+- After successful login, user sees JSON response with token
+- Extract user data and store in localStorage
+
+---
+
+### 4. Get Current User
+
+**GET** `/api/auth/me`
+
+#### Headers
+
+- Requires JWT cookie (automatically sent)
+
+#### Success Response (200)
+
+```json
+{
+  "user": {
+    "id": "user_id",
+    "name": "John Doe",
+    "email": "john@example.com",
+    "role": "user"
+  }
+}
+```
+
+#### Error Response (401)
+
+```json
+{
+  "message": "Not authorized, no token"
+}
+```
+
+#### Frontend Handling
+
+- Use on app initialization to check if user is logged in
+- If 401 error: redirect to login page
+- If success: set user as authenticated
+
+---
+
+### 5. Get User Profile
+
+**GET** `/api/user/profile`
+
+#### Headers
+
+- Requires JWT cookie (automatically sent)
+
+#### Success Response (200)
+
+```json
+{
+  "user": {
+    "id": "user_id",
+    "name": "John Doe",
+    "email": "john@example.com",
+    "role": "user",
+    "phone": "9876543210",
+    "provider": "local",
+    "googleId": null,
+    "createdAt": "2024-01-15T10:30:00.000Z",
+    "updatedAt": "2024-01-15T10:30:00.000Z"
+  }
+}
+```
+
+#### Error Response (401)
+
+```json
+{
+  "message": "Unauthorized: No user logged in"
+}
+```
+
+#### Frontend Handling
+
+- Use for profile page to show detailed user information
+- Display all user fields in profile form
+- Handle loading states
+
+---
+
+### 6. Update User Profile
+
+**PATCH** `/api/user/profile`
+
+#### Headers
+
+- Requires JWT cookie (automatically sent)
+
+#### Request Body (any combination)
+
+```json
+{
+  "name": "New Name",
+  "email": "newemail@example.com",
+  "phone": "9999999999",
+  "password": "NewPassword123!",
+  "oldPassword": "CurrentPassword123!"
+}
+```
+
+#### Success Response (200)
+
+```json
+{
+  "message": "Profile updated successfully",
+  "user": {
+    "id": "user_id",
+    "name": "New Name",
+    "email": "newemail@example.com",
+    "role": "user",
+    "phone": "9999999999",
+    "provider": "local",
+    "googleId": null,
+    "createdAt": "2024-01-15T10:30:00.000Z",
+    "updatedAt": "2024-01-15T11:00:00.000Z"
+  }
+}
+```
+
+#### Error Responses
+
+```json
+// Password change for social login users
+{
+  "message": "You cannot change password for social login account"
+}
+
+// Wrong old password
+{
+  "message": "Old password incorrect"
+}
+
+// Email already exists
+{
+  "message": "Email already exists"
+}
+
+// Weak password
+{
+  "message": "Password must be at least 6 characters and include uppercase, lowercase, number, and special character"
+}
+```
+
+#### Frontend Handling
+
+- Create profile edit form with individual field updates
+- For password change: require old password field
+- Show success message on update
+- Update localStorage with new user data
+- Handle specific error messages
+
+---
+
+### 7. Logout User
+
+**POST** `/api/auth/logout`
+
+#### Headers
+
+- Requires JWT cookie (automatically sent)
+
+#### Success Response (200)
+
+```json
+{
+  "message": "Logged out successfully"
+}
+```
+
+#### Frontend Handling
+
+- Call on logout button click
+- Clear localStorage user data
+- Redirect to login page
+- Show "Logged out successfully" message
+
+---
+
 ## Frontend Integration Guide
 
 ### Essential Request Configuration
