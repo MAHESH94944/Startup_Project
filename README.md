@@ -1,4 +1,4 @@
-# Ecommerce Backend API
+# Warner & Spencer - Ecommerce API
 
 **Live Backend URL:** `https://warner-and-spencer-shoes.onrender.com`
 
@@ -6,147 +6,196 @@
 
 ---
 
-## Important Notes for Frontend Team
+## Guide for Frontend Developers
 
-### Cold Start Handling
+This document provides all necessary information to integrate the frontend with our ecommerce backend API.
 
-- **First request may be slow (10-30 seconds)** due to Render's free tier cold starts.
-- **Add loading states** in your frontend and consider retry logic for failed initial requests.
-- Use the `/health` endpoint to warm up the server if needed.
+### Important Concepts
 
-### Authentication
+1.  **Cold Starts**: Our backend is hosted on Render's free tier. The first request after a period of inactivity may take **10-30 seconds** to process as the server "wakes up". Please implement loading indicators in the UI to handle this delay. You can use the `/health` endpoint to "warm up" the server.
 
-- **Cookie-Based Auth**: The backend uses secure, HTTP-only cookies for session management.
-- **Include Credentials**: All frontend requests must include `credentials: 'include'` to send cookies.
-- **CORS**: CORS is enabled to allow requests from any origin with credentials.
+2.  **Authentication**: We use a secure, cookie-based authentication system. The JWT token is stored in an `httpOnly` cookie. For your frontend requests to work, you **must** include `credentials: 'include'` in your `fetch` or `axios` configuration.
+
+3.  **CORS**: Cross-Origin Resource Sharing is enabled to allow requests from any origin, as long as credentials are included.
 
 ---
 
-## API Endpoints
+## API Reference
 
 ### Health Check
 
-**GET** `/health` - Use this to check if the server is awake.
+A simple endpoint to verify that the server is running.
 
-- **Success Response (200):** `{"status": "OK", "timestamp": "..."}`
+- **GET** `/health`
+  - **Success Response (200):** `{"status": "OK", "timestamp": "..."}`
 
 ---
 
 ### Authentication Endpoints
 
+Endpoints for user registration, login, and session management.
+
 #### 1. Register User
 
-**POST** `/api/auth/register`
-
+- **POST** `/api/auth/register`
+- **Description:** Creates a new user account.
 - **Body:** `{ "name": "...", "email": "...", "password": "..." }`
 - **Success (201):** `{ "message": "User registered successfully", "user": {...} }`
 - **Error (400):** `{ "message": "Email already exists" }` or validation error.
 
 #### 2. Login User
 
-**POST** `/api/auth/login`
-
+- **POST** `/api/auth/login`
+- **Description:** Authenticates a user and sets the session cookie.
 - **Body:** `{ "email": "...", "password": "..." }`
 - **Success (200):** `{ "message": "Login successful", "user": {...} }`
 - **Error (400):** `{ "message": "Invalid credentials" }`
 
 #### 3. Google OAuth Login
 
-**GET** `/api/auth/google`
+- **GET** `/api/auth/google`
+- **Description:** Redirects the user to Google's OAuth screen. After successful authentication, Google redirects back, and the backend returns a JSON response with the user's info and a JWT token.
+- **Usage:** Your frontend should have a "Login with Google" button that navigates to this URL.
 
-- **Usage:** Redirect the user to this URL. After Google login, the user will see a JSON response with a `token` and `user` object. The frontend should handle this response to complete the login process.
+#### 4. Get Current Authenticated User
 
-#### 4. Get Current User
-
-**GET** `/api/auth/me`
-
-- **Headers:** Requires authentication cookie.
+- **GET** `/api/auth/me`
+- **Description:** Retrieves the currently logged-in user's basic info. Ideal for checking authentication status on app load.
+- **Auth:** Required.
 - **Success (200):** `{ "user": {...} }`
 - **Error (401):** `{ "message": "Not authorized, no token" }`
 
 #### 5. Logout User
 
-**POST** `/api/auth/logout`
-
-- **Headers:** Requires authentication cookie.
+- **POST** `/api/auth/logout`
+- **Description:** Clears the session cookie, logging the user out.
+- **Auth:** Required.
 - **Success (200):** `{ "message": "Logged out successfully" }`
 
 ---
 
 ### User Profile Endpoints
 
+Endpoints for managing the logged-in user's profile.
+
 #### 1. Get User Profile
 
-**GET** `/api/user/profile`
-
-- **Headers:** Requires authentication cookie.
-- **Success (200):** `{ "user": {...} }` (Returns full user profile).
+- **GET** `/api/user/profile`
+- **Description:** Retrieves the full profile of the currently logged-in user.
+- **Auth:** Required.
+- **Success (200):** `{ "user": {...} }`
 
 #### 2. Update User Profile
 
-**PATCH** `/api/user/profile`
-
-- **Headers:** Requires authentication cookie.
+- **PATCH** `/api/user/profile`
+- **Description:** Updates the logged-in user's profile information.
+- **Auth:** Required.
 - **Body:** `{ "name": "...", "phone": "...", "oldPassword": "...", "password": "..." }` (any combination).
 - **Success (200):** `{ "message": "Profile updated successfully", "user": {...} }`
-- **Error (400):** For incorrect old password, social login password change attempt, etc.
+- **Error (400):** For incorrect old password, trying to change password for a social login account, etc.
 
 ---
 
 ### Admin Product Endpoints
 
-_All admin routes require admin-level authentication._
+These endpoints are restricted to users with an `admin` role.
 
 #### 1. Add a New Product
 
-**POST** `/api/admin/products`
-
-- **Headers:** `Content-Type: multipart/form-data` (Postman sets this automatically when you use form-data).
+- **POST** `/api/admin/products`
+- **Description:** Creates a new product. Requires `multipart/form-data` for image uploads.
+- **Auth:** Admin Required.
+- **Headers:** `Content-Type: multipart/form-data`
 - **Body (form-data):**
   - `img`: (File) One or more image files.
   - `title`: (Text) "Premium Leather Shoes"
-  - `price`: (Text) 4999
-  - `stock`: (Text) 100
+  - `price`: (Text) `4999`
+  - `discount`: (Text) `10`
   - `size`: (Text) `[8,9,10]` **(Must be a valid JSON array string)**
+  - `description`: (Text) "Handcrafted premium leather shoes with fine stitching."
   - `color`: (Text) `["Black","Brown"]` **(Must be a valid JSON array string)**
-  - `productInformation`: (Text) `{"material":"Leather","care":"Wipe clean"}` **(Must be a valid JSON object string)**
-  - ... other text fields
+  - `country`: (Text) "India"
+  - `deliveryAndReturns`: (Text) "Free delivery and 30-day returns."
+  - `productInformation`: (Text) `{"material":"100% Genuine Leather","care":"Wipe with a clean, dry cloth."}` **(Must be a valid JSON object string)**
+  - `stock`: (Text) `100`
+- **Success (201):** `{ "message": "Product created successfully", "product": {...} }`
 
-#### How to Test with Postman (form-data)
+#### 2. Get All Products (Admin View)
 
-The "unexpected end of file" error happens because you must send this request as `multipart/form-data`, not as raw JSON, when uploading files.
+- **GET** `/api/admin/products`
+- **Description:** Retrieves a paginated and filterable list of all products.
+- **Auth:** Admin Required.
+- **Query Params (optional):** `page`, `limit`, `search`, `color`, `size`.
+- **Success (200):** `{ "products": [...], "totalPages": ..., "currentPage": ..., "total": ... }`
 
-1.  In Postman, set the request method to **POST**.
-2.  Go to the **Body** tab and select **form-data**.
-3.  Add your fields as key-value pairs:
-    - For **text fields** (`title`, `price`, etc.), enter the key and its value.
-    - For **array/object fields** (`size`, `color`, `productInformation`), enter the key and a **valid JSON string** as the value.
-    - For **image files**, enter the key (`img`), and in the value column, click the dropdown and select **File**. Then you can choose the image(s) from your computer.
+#### 3. Get Single Product by ID
 
-**Example Postman Setup:**
+- **GET** `/api/admin/products/:id`
+- **Description:** Retrieves a single product by its ID.
+- **Auth:** Admin Required.
+- **Success (200):** `{ "product": {...} }`
 
-| KEY                  | VALUE                                                      |
-| -------------------- | ---------------------------------------------------------- |
-| `img`                | (File) `shoe1.jpg`                                         |
-| `img`                | (File) `shoe2.jpg`                                         |
-| `title`              | `Classic Leather Loafers`                                  |
-| `price`              | `3500`                                                     |
-| `stock`              | `50`                                                       |
-| `size`               | `[8, 9, 10]`                                               |
-| `color`              | `["Tan", "Black"]`                                         |
-| `productInformation` | `{"material": "Full-grain leather", "care": "Use polish"}` |
+#### 4. Update Product
+
+- **PUT** `/api/admin/products/:id`
+- **Description:** Updates an existing product. Also uses `multipart/form-data`.
+- **Auth:** Admin Required.
+- **Headers:** `Content-Type: multipart/form-data`
+- **Body (form-data):** Any fields to update. New images will replace old ones.
+- **Success (200):** `{ "message": "Product updated successfully", "product": {...} }`
+
+#### 5. Delete Product
+
+- **DELETE** `/api/admin/products/:id`
+- **Description:** Deletes a product by its ID.
+- **Auth:** Admin Required.
+- **Success (200):** `{ "message": "Product deleted successfully" }`
 
 ---
 
-#### 2. Get All Products
+## Running the Project Locally
 
-**GET** `/api/admin/products`
+1.  Create a `.env` file and populate it with your own credentials.
+2.  Run `npm install` to install dependencies.
+3.  Run `npm start` to start the server on `http://localhost:5000`.
+
+**🚀 Backend is production-ready and fully tested!**
 
 - **Query Params (optional):** `page`, `limit`, `search`, `color`, `size`.
 - **Success (200):** `{ "products": [...], "totalPages": ..., "currentPage": ..., "total": ... }`
 
 #### 3. Get Single Product by ID
 
+- **GET** `/api/admin/products/:id`
+- **Description:** Retrieves a single product by its ID.
+- **Auth:** Admin Required.
+- **Success (200):** `{ "product": {...} }`
+
+#### 4. Update Product
+
+- **PUT** `/api/admin/products/:id`
+- **Description:** Updates an existing product. Also uses `multipart/form-data`.
+- **Auth:** Admin Required.
+- **Headers:** `Content-Type: multipart/form-data`
+- **Body (form-data):** Any fields to update. New images will replace old ones. Use the same `FormData` approach as for adding a product.
+- **Success (200):** `{ "message": "Product updated successfully", "product": {...} }`
+
+#### 5. Delete Product
+
+- **DELETE** `/api/admin/products/:id`
+- **Description:** Deletes a product by its ID.
+- **Auth:** Admin Required.
+- **Success (200):** `{ "message": "Product deleted successfully" }`
+
+---
+
+## Running the Project Locally
+
+1.  Create a `.env` file and populate it with your own credentials.
+2.  Run `npm install` to install dependencies.
+3.  Run `npm start` to start the server on `http://localhost:5000`.
+
+**🚀 Backend is production-ready and fully tested!**
 **GET** `/api/admin/products/:id`
 
 - **Success (200):** `{ "product": {...} }`
@@ -174,3 +223,7 @@ The "unexpected end of file" error happens because you must send this request as
 3. Run `npm start` to start the server.
 
 **🚀 Backend is production-ready and fully tested!**
+
+```
+
+```
