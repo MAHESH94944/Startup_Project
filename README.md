@@ -16,13 +16,10 @@ This document provides all necessary information to integrate the frontend with 
 
 2.  **Authentication**: We use a secure, cookie-based authentication system. The JWT token is stored in an `httpOnly` cookie. For your frontend requests to work, you **must** include `credentials: 'include'` in your `fetch` or `axios` configuration.
 
-3.  **CORS**: Cross-Origin Resource Sharing is configured to only allow requests from the domain specified in the `FRONTEND_URL` environment variable. For local development, you may need to add your localhost URL (e.g., `http://localhost:3000`) to the allowed origins in `app.js`.
-
-### Performance & Deployment Notes
-
-- **Slow Initial Deployment**: The deployment process may seem slow the first time after adding new dependencies (like `imagekit` and `multer`). This is because the hosting service (Render) needs to download and install all packages from scratch.
-- **Faster Subsequent Deployments**: Future deployments will be much faster as Render caches the installed dependencies (`node_modules`). The slowness is typically a one-time event per dependency change.
-- **Code Optimization**: The controllers have been optimized to reduce code duplication and improve maintainability. The core logic remains the same.
+3.  **CORS**: Cross-Origin Resource Sharing is configured to only allow requests from the following domains:
+    - `https://warnershoes.onrender.com` (Main Frontend)
+    - `https://warnershoesadmin.onrender.com` (Admin Frontend)
+    - `http://localhost:5173` (Local Development)
 
 ---
 
@@ -161,9 +158,11 @@ These endpoints are restricted to users with an `admin` role.
 
 ## Running the Project Locally
 
-1.  Create a `.env` file and populate it with your own credentials, including `FRONTEND_URL=http://localhost:3000`.
+1.  Create a `.env` file and populate it with your own credentials, including `FRONTEND_URL=http://localhost:5173` and `ADMIN_FRONTEND_URL=http://localhost:xxxx` (your local admin port).
 2.  Run `npm install` to install dependencies.
 3.  Run `npm start` to start the server on `http://localhost:5000`.
+
+**🚀 Backend is production-ready and fully tested!** 3. Run `npm start` to start the server on `http://localhost:5000`.
 
 **🚀 Backend is production-ready and fully tested!**
 

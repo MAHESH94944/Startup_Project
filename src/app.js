@@ -14,7 +14,11 @@ const app = express();
 // Middleware
 app.use(express.json());
 
-const allowedOrigins = [process.env.FRONTEND_URL, "http://localhost:3000"]; // Add your local dev URL if needed
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  process.env.ADMIN_FRONTEND_URL,
+  "http://localhost:5173", // Your local dev URL
+];
 
 app.use(
   cors({
