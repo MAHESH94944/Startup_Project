@@ -11,6 +11,30 @@ const createToken = (user) => {
   );
 };
 
+// Helper function to set the token cookie
+const sendTokenResponse = (res, user, message) => {
+  const token = createToken(user);
+
+  const cookieOptions = {
+    httpOnly: true,
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax", // Use 'lax' for better compatibility with redirects
+  };
+
+  res.cookie("token", token, cookieOptions);
+
+  res.json({
+    message,
+    user: {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    },
+  });
+};
+
 // Controller for user registration (local signup)
 exports.register = async (req, res) => {
   try {
@@ -47,24 +71,8 @@ exports.register = async (req, res) => {
       password,
       role: "user",
     });
-    // Generate JWT and set as cookie
-    const token = createToken(user);
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    });
-    res.status(201).json({
-      message: "User registered successfully",
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
-      // Do not return token in body for security
-    });
+    
+    sendTokenResponse(res, user, "User registered successfully");
   } catch (err) {
     // Log error internally, but send generic message to client
     console.error("Registration error:", err);
@@ -90,23 +98,8 @@ exports.login = async (req, res) => {
     if (!isMatch) {
       return res.status(400).json({ message: "Invalid credentials" });
     }
-    // Generate JWT and set as cookie
-    const token = createToken(user);
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    });
-    res.json({
-      message: "Login successful",
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
-    });
+    
+    sendTokenResponse(res, user, "Login successful");
   } catch (err) {
     console.error("Login error:", err);
     res.status(500).json({ message: "Server error" });
@@ -115,28 +108,31 @@ exports.login = async (req, res) => {
 
 // Controller for Google OAuth callback
 // Called after Google redirects back to our server
-// Generates JWT and returns token and user info as JSON (for debugging)
+// Sets a persistent cookie and redirects to the frontend
 exports.googleCallback = (req, res) => {
   try {
     const user = req.user;
     if (!user) {
-      return res.status(401).json({ message: "Google authentication failed" });
+      return res.status(401).redirect(`${process.env.FRONTEND_URL}/login?error=auth_failed`);
     }
-    const jwt = require("jsonwebtoken");
-    const token = jwt.sign(
-      { id: user._id, email: user.email, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
 
-    res.status(200).json({
-      message: "Login successful",
-      token,
-      user,
-    });
+    const token = createToken(user);
+
+    const cookieOptions = {
+      httpOnly: true,
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+    };
+
+    res.cookie("token", token, cookieOptions);
+
+    // Redirect to the frontend dashboard or home page
+    res.redirect(process.env.FRONTEND_URL || '/');
+
   } catch (err) {
     console.error("Google OAuth error:", err);
-    res.status(500).json({ error: "Internal server error" });
+    res.redirect(`${process.env.FRONTEND_URL}/login?error=server_error`);
   }
 };
 
@@ -164,3 +160,4 @@ exports.getMe = (req, res) => {
     },
   });
 };
+ 

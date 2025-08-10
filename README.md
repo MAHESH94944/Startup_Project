@@ -57,8 +57,8 @@ Endpoints for user registration, login, and session management.
 #### 3. Google OAuth Login
 
 - **GET** `/api/auth/google`
-- **Description:** Redirects the user to Google's OAuth screen. After successful authentication, Google redirects back, and the backend returns a JSON response with the user's info and a JWT token.
-- **Usage:** Your frontend should have a "Login with Google" button that navigates to this URL.
+- **Description:** Redirects the user to Google's OAuth screen. After successful authentication, the user is **redirected back to your frontend application** (as defined by `FRONTEND_URL` in `.env`). The session cookie is set automatically by the server.
+- **Usage:** Your frontend should have a "Login with Google" button that navigates to this URL. Your frontend application should then check the user's authentication status (e.g., by calling `/api/auth/me`) when it loads after the redirect.
 
 #### 4. Get Current Authenticated User
 
@@ -224,6 +224,15 @@ These endpoints are restricted to users with an `admin` role.
 
 **🚀 Backend is production-ready and fully tested!**
 
-```
+### Troubleshooting
 
-```
+#### Login Session Not Persisting After Refresh
+
+If you find that users are logged out after refreshing the page, it's almost always a cookie issue.
+
+1.  **Persistent Cookies**: The backend is now configured to set a persistent cookie with a `maxAge` of 7 days for all login methods (local and Google).
+2.  **`credentials: 'include'`**: Ensure your frontend `fetch` or `axios` requests **always** include this option. Without it, the browser will not send the cookie back to the server on subsequent requests.
+3.  **Browser DevTools**: Use the "Application" tab in your browser's developer tools to inspect the cookie. Check that the `token` cookie exists, and that its `Expires / Max-Age` is set to a future date.
+4.  **`sameSite: 'lax'`**: The cookie policy has been updated to `lax` for better compatibility with cross-site redirects from Google.
+
+---
