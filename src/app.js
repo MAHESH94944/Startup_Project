@@ -11,31 +11,11 @@ const adminRoutes = require("./routes/adminRoutes");
 
 const app = express();
 
-// Trust first proxy (needed on Render/Heroku for secure cookies + protocol detection)
-app.set("trust proxy", 1);
-
 // Middleware
 app.use(express.json());
 
-// CORS configuration – allow specific frontends (env) and local dev; supports credentialed requests.
-const allowedOrigins = [
-  process.env.FRONTEND_URL,
-  process.env.ADMIN_FRONTEND_URL,
-  "http://localhost:5173",
-  "http://localhost:3000",
-].filter(Boolean);
-
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      // Allow non-browser tools (no origin) and allowed domains
-      if (!origin || allowedOrigins.includes(origin))
-        return callback(null, true);
-      return callback(new Error("Not allowed by CORS"));
-    },
-    credentials: true,
-  })
-);
+// Simplified permissive CORS (reflect request origin) with credentials
+app.use(cors({ origin: true, credentials: true }));
 app.use(morgan("dev"));
 app.use(cookieParser());
 app.use(passport.initialize());
