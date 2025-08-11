@@ -15,11 +15,13 @@ const createToken = (user) => {
 const sendTokenResponse = (res, user, message) => {
   const token = createToken(user);
 
+  const isProd = process.env.NODE_ENV === "production";
   const cookieOptions = {
     httpOnly: true,
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax", // Use 'lax' for better compatibility with redirects
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    secure: isProd, // must be true when SameSite=None
+    sameSite: isProd ? "none" : "lax",
+    path: "/",
   };
 
   res.cookie("token", token, cookieOptions);
@@ -71,7 +73,7 @@ exports.register = async (req, res) => {
       password,
       role: "user",
     });
-    
+
     sendTokenResponse(res, user, "User registered successfully");
   } catch (err) {
     // Log error internally, but send generic message to client
@@ -95,10 +97,11 @@ exports.login = async (req, res) => {
     }
     // Check password
     const isMatch = await user.matchPassword(password);
+
     if (!isMatch) {
       return res.status(400).json({ message: "Invalid credentials" });
     }
-    
+
     sendTokenResponse(res, user, "Login successful");
   } catch (err) {
     console.error("Login error:", err);
@@ -113,23 +116,22 @@ exports.googleCallback = (req, res) => {
   try {
     const user = req.user;
     if (!user) {
-      return res.status(401).redirect(`${process.env.FRONTEND_URL}/login?error=auth_failed`);
+      return res
+        .status(401)
+        .redirect(`${process.env.FRONTEND_URL}/login?error=auth_failed`);
     }
 
     const token = createToken(user);
-
-    const cookieOptions = {
+    const isProd = process.env.NODE_ENV === "production";
+    res.cookie("token", token, {
       httpOnly: true,
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-    };
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      secure: isProd,
+      sameSite: isProd ? "none" : "lax",
+      path: "/",
+    });
 
-    res.cookie("token", token, cookieOptions);
-
-    // Redirect to the frontend dashboard or home page
-    res.redirect(process.env.FRONTEND_URL || '/');
-
+    res.redirect(process.env.FRONTEND_URL || "/");
   } catch (err) {
     console.error("Google OAuth error:", err);
     res.redirect(`${process.env.FRONTEND_URL}/login?error=server_error`);
@@ -138,10 +140,12 @@ exports.googleCallback = (req, res) => {
 
 // Controller for logging out the user (clears the JWT cookie)
 exports.logout = (req, res) => {
+  const isProd = process.env.NODE_ENV === "production";
   res.clearCookie("token", {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    secure: isProd,
+    sameSite: isProd ? "none" : "lax",
+    path: "/",
   });
   res.status(200).json({ message: "Logged out successfully" });
 };
@@ -160,4 +164,3 @@ exports.getMe = (req, res) => {
     },
   });
 };
- 

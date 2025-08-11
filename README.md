@@ -235,4 +235,20 @@ If you find that users are logged out after refreshing the page, it's almost alw
 3.  **Browser DevTools**: Use the "Application" tab in your browser's developer tools to inspect the cookie. Check that the `token` cookie exists, and that its `Expires / Max-Age` is set to a future date.
 4.  **`sameSite: 'lax'`**: The cookie policy has been updated to `lax` for better compatibility with cross-site redirects from Google.
 
----
+### Session Persistence (Why token disappeared on refresh)
+
+If the frontend runs on a different domain (e.g., `warnershoes.onrender.com`) and the API is on `warner-and-spencer-shoes.onrender.com`, the auth cookie is cross-site.
+
+To make it work:
+
+- Cookie is now set with: `SameSite=None; Secure; HttpOnly`
+- Always send requests with `credentials: 'include'`
+- Do NOT set `withCredentials: true` without also setting allowed CORS origins (already configured)
+- Optional fallback: use `Authorization: Bearer <token>` header (now supported)
+
+If the cookie still does not appear:
+
+1. Check DevTools > Application > Cookies (correct domain)
+2. Ensure request is HTTPS (SameSite=None requires Secure)
+3. Make sure no browser extensions block third-party cookies
+4. Verify response headers include `Set-Cookie: token=...; SameSite=None; Secure`
