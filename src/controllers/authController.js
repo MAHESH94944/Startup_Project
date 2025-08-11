@@ -10,19 +10,13 @@ const createToken = (user) =>
     { expiresIn: "7d" }
   );
 
-// Centralized cookie options so persistence is consistent everywhere.
-// In production (Render) frontend and backend are on different domains, so we need SameSite=None + Secure.
-// We also rely on app.set('trust proxy', 1) so secure cookies are accepted behind the proxy.
-const getCookieOptions = () => {
-  const isProd = process.env.NODE_ENV === "production";
-  return {
-    httpOnly: true,
-    secure: isProd, // must be true for SameSite=None cookies
-    sameSite: isProd ? "None" : "Lax",
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    path: "/",
-  };
-};
+// Simplified cookie options (user requested removal of sameSite / secure flags)
+// NOTE: Without SameSite=None + Secure, cross-site cookie usage between different domains may fail.
+// If you experience missing cookies from a different frontend origin, reintroduce those attributes.
+const getCookieOptions = () => ({
+  httpOnly: true,
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+});
 
 const sendTokenResponse = (res, user, message) => {
   const token = createToken(user);
