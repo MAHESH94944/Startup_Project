@@ -10,13 +10,34 @@ const createToken = (user) =>
     { expiresIn: "7d" }
   );
 
-// Simplified cookie options (user requested removal of sameSite / secure flags)
-// NOTE: Without SameSite=None + Secure, cross-site cookie usage between different domains may fail.
-// If you experience missing cookies from a different frontend origin, reintroduce those attributes.
-const getCookieOptions = () => ({
-  httpOnly: true,
-  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-});
+// Cookie options with environment-driven flexibility for cross-domain frontends.
+// Goals:
+// - Production (different domains) -> SameSite=None + Secure (required for modern browsers)
+// - Local dev (http://localhost:5173) -> Lax + not Secure so cookie is accepted over HTTP
+// Overrides via env:
+//   COOKIE_SAMESITE (None|Lax|Strict) and COOKIE_SECURE (true|false) if you need manual control.
+const getCookieOptions = () => {
+  const maxAge = 7 * 24 * 60 * 60 * 1000;
+  const envSameSite = process.env.COOKIE_SAMESITE; // optional override
+  const envSecure = process.env.COOKIE_SECURE; // optional override
+  const isProd = process.env.NODE_ENV === "production";
+
+  let sameSite;
+  if (envSameSite) sameSite = envSameSite;
+  else sameSite = isProd ? "None" : "Lax";
+
+  let secure;
+  if (envSecure !== undefined) secure = envSecure === "true";
+  else secure = sameSite === "None"; // browsers require Secure when SameSite=None
+
+  return {
+    httpOnly: true,
+    sameSite,
+    secure,
+    maxAge,
+    path: "/",
+  };
+};
 
 const sendTokenResponse = (res, user, message) => {
   const token = createToken(user);

@@ -12,12 +12,30 @@ const adminRoutes = require("./routes/adminRoutes");
 const app = express();
 
 // Middleware
-
-// Simplified permissive CORS (reflect request origin) with credentials
+// Re-enable trust proxy so Secure cookies work behind Render's proxy
+app.set("trust proxy", 1);
 app.use(morgan("dev"));
 app.use(express.json());
 app.use(cookieParser());
-app.use(cors({ origin: true, credentials: true }));
+
+// Explicit CORS allowlist to prevent random origins & ensure credential cookies accepted
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  process.env.ADMIN_FRONTEND_URL,
+  "http://localhost:5173",
+  "http://localhost:3000",
+].filter(Boolean);
+
+app.use(
+  cors({
+    origin: (origin, cb) => {
+      if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+      return cb(new Error("CORS: Origin not allowed"));
+    },
+    credentials: true,
+  })
+);
+
 app.use(passport.initialize());
 
 // Health check endpoint

@@ -10,7 +10,7 @@ Status: ✅ Production (Render)
 
 Node.js + Express + MongoDB + Passport (Google OAuth) + JWT (httpOnly cookie) + ImageKit uploads.
 
-Auth flow: On login / register / Google callback we issue a 7‑day JWT and set it in a persistent httpOnly cookie `token` (and also return the token in JSON as a fallback). In production the cookie is: `SameSite=None; Secure`. In development: `SameSite=Lax; Secure=false`.
+Auth flow: On login / register / Google callback we issue a 7‑day JWT and set it in a persistent httpOnly cookie `token` (and also return the token in JSON as a fallback). Current cookie options: httpOnly + maxAge 7 days (no SameSite / Secure flags enabled right now).
 
 All stateful frontend calls MUST include credentials so the cookie is sent.
 
@@ -55,18 +55,16 @@ src/utils/validator.js – Password strength helper.
 
 ## 4. CORS & Cookies
 
-Allowed origins: FRONTEND_URL, ADMIN_FRONTEND_URL, http://localhost:5173, http://localhost:3000.
+Current configuration (simplified):
 
-Credentials: true (so browser sends cookies).
+- CORS: `origin: true` → reflects ANY requesting origin (permissive). Use only for rapid development; tighten before real production.
+- `credentials: true` → browser allowed to send the cookie.
+- Cookie: only `httpOnly: true`, `maxAge: 7d`.
 
-Cookie options via central helper:
+Implications:
 
-- Max Age: 7 days
-- httpOnly: true
-- Production: Secure + SameSite=None (cross‑site allowed)
-- Dev: Secure false + SameSite=Lax
-
-If the frontend is on a different domain and you forget `credentials: 'include'`, you will appear logged out.
+- Without SameSite=None + Secure, some cross-domain scenarios may fail to persist cookies. If your frontend runs on a different domain and the cookie is missing, reintroduce those attributes in the backend.
+- ALWAYS include `credentials: 'include'` (fetch) or `withCredentials: true` (axios) in any stateful call.
 
 ---
 
@@ -83,35 +81,147 @@ Fallback Token Usage: If a browser blocks third‑party cookies, you may capture
 
 ---
 
-## 6. Endpoint Reference
+## 6. Detailed Endpoint Reference (Request / Response / UI Notes)
 
-Health: GET /health → { status, timestamp }
+Formatting Legend:
+Method PATH – Description
+Request Body (JSON unless stated) | Query | Params
+Success 200/201 Response Shape
+Common Errors & Handling Tips
 
-### Auth
+### 6.1 Health
 
-POST /api/auth/register Body: { name, email, password }
-POST /api/auth/login Body: { email, password }
-GET /api/auth/google (redirect to Google)
-GET /api/auth/google/callback (internal – cookie set, redirects)
-GET /api/auth/me (requires cookie / bearer)
-POST /api/auth/logout
+GET /health – Liveness check.
+Response: { status: "OK", timestamp: string }
+UI: Use on app startup (optional) & for warmups.
 
-### User
+### 6.2 Authentication
 
-GET /api/user/profile
-PATCH /api/user/profile Body (any): { name, email, phone, oldPassword, password }
+1. Register
+   POST /api/auth/register
+   Body: { name: string, email: string, password: string }
+   Success (201): {
+   message: "User registered successfully",
+   token: string, // JWT (optional fallback)
+   user: { id, name, email, role }
+   }
+   Errors:
 
-### Admin Products (require admin role)
+- 400 Invalid input types / missing fields / weak password / existing user
+- 500 Server error
+  UI handling: Inline form validation; on success store user in state; no need to store token unless cookie fails.
 
-POST /api/admin/products (multipart/form-data + images)
-GET /api/admin/products
+2. Login
+   POST /api/auth/login
+   Body: { email: string, password: string }
+   Success (200): { message: "Login successful", token, user }
+   Errors: 400 Invalid credentials | 500 Server error
+   UI: Clear previous errors; after success call /api/auth/me (optional confirmation) then navigate.
+
+3. Google OAuth
+   GET /api/auth/google – Redirect to Google. No JSON.
+   On return: Backend sets cookie & redirects to FRONTEND_URL.
+   UI: After redirect landing page, call GET /api/auth/me to populate state.
+
+4. Current User
+   GET /api/auth/me (protected)
+   Headers: Cookie automatically, or Authorization: Bearer <token>
+   Success (200): { user: { id, name, email, role } }
+   Errors: 401 Not authenticated
+   UI: Use in root auth guard; if 401, show anonymous view.
+
+5. Logout
+   POST /api/auth/logout
+   Success (200): { message: "Logged out successfully" }
+   UI: After success purge local state and redirect to login/home.
+
+### 6.3 User Profile
+
+Get Profile
+GET /api/user/profile (protected)
+Success (200): {
+user: { id, name, email, role, phone, provider, googleId, createdAt, updatedAt }
+}
+Errors: 401 Unauthorized
+UI: Show profile screen; if 401 redirect to login.
+
+Update Profile
+PATCH /api/user/profile (protected)
+Body (any subset): { name?, email?, phone?, oldPassword?, password? }
+Success (200): { message: "Profile updated successfully", user: { ...updatedFields } }
+Errors:
+
+- 401 Unauthorized (no cookie)
+- 400 (email conflict or password rules – depending on future validation)
+  UI: For password change require oldPassword + new password; optimistic update after success.
+
+### 6.4 Admin Product Management (auth + role=admin required)
+
+Product Model Fields (reference):
+{
+img: string[], title: string, price: number, discount?: number,
+size?: number[], description: string, color?: string[], country?: string,
+deliveryAndReturns?: string, productInformation?: { material?, care? },
+stock: number, createdBy: userId, createdAt, updatedAt
+}
+
+Add Product
+POST /api/admin/products (multipart/form-data)
+Form Data:
+
+- img (File) up to 5
+- title, price, discount, description (required: title, price, description)
+- size (JSON array string) e.g. [8,9]
+- color (JSON array string) e.g. ["Black","Brown"]
+- country, deliveryAndReturns
+- productInformation (JSON object string) e.g. {"material":"Leather","care":"Dry wipe"}
+- stock (number)
+  Success (201): { message: "Product created successfully", product }
+  Errors: 400 validation | 401 auth | 403 not admin | 500 server
+  UI: Use FormData; show upload spinner; validate JSON fields before submit.
+
+List Products (Admin)
+GET /api/admin/products?search=&color=&size=&page=&limit=
+Success (200): { products: Product[], total, totalPages, currentPage }
+UI: Debounced search; maintain pagination state.
+
+Get One
 GET /api/admin/products/:id
-PUT /api/admin/products/:id (multipart/form-data)
+Success (200): { product }
+Errors: 404 if not found
+UI: Prefetch when entering edit page.
+
+Update Product
+PUT /api/admin/products/:id (multipart/form-data, same fields as create; omit unchanged)
+Success (200): { message: "Product updated successfully", product }
+UI: Send only changed JSON fields; when replacing images include new files; if no images sent backend may keep existing (confirm in implementation).
+
+Delete Product
 DELETE /api/admin/products/:id
+Success (200): { message: "Product deleted successfully" }
+UI: Confirm dialog -> optimistic remove from list -> rollback if error.
 
-### Public Products (WIP)
+### 6.5 Public Product Routes
 
-Current non-admin product routes scaffolded under /api/product (extend as needed).
+Currently minimal (only an authenticated add route under /api/product/products duplicating admin add). Expect future endpoints: list, view, filter. Treat present non-admin product route as experimental.
+
+---
+
+## 6.a Standard Error Response Shapes (Typical)
+
+401: { message: "Not authorized, no token" } or { message: "Not authenticated" }
+403: { message: "Access denied: Admins only" }
+400: { message: "Invalid credentials" | "User already exists" | validation message }
+404: { message: "Not found" } (when implemented)
+500: { message: "Server error" }
+
+UI Strategy:
+
+- Map message to toast/alert.
+- For 401 on /me silently clear session and show login.
+- For 500 show generic retry option.
+
+---
 
 ---
 
