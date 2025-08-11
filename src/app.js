@@ -12,12 +12,12 @@ const adminRoutes = require("./routes/adminRoutes");
 const app = express();
 
 // Middleware
-app.use(express.json());
 
 // Simplified permissive CORS (reflect request origin) with credentials
-app.use(cors({ origin: true, credentials: true }));
 app.use(morgan("dev"));
+app.use(express.json());
 app.use(cookieParser());
+app.use(cors({ origin: true, credentials: true }));
 app.use(passport.initialize());
 
 // Health check endpoint
