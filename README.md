@@ -1,268 +1,310 @@
-# Warner & Spencer - Ecommerce API
+# Warner & Spencer – E‑Commerce API
 
-**Live Backend URL:** `https://warner-and-spencer-shoes.onrender.com`
+Live Backend: https://warner-and-spencer-shoes.onrender.com
 
-**Status:** ✅ **LIVE AND WORKING**
-
----
-
-## Guide for Frontend Developers
-
-This document provides all necessary information to integrate the frontend with our ecommerce backend API.
-
-### Important Concepts
-
-1.  **Cold Starts**: Our backend is hosted on Render's free tier. The first request after a period of inactivity may take **10-30 seconds** to process as the server "wakes up". Please implement loading indicators in the UI to handle this delay. You can use the `/health` endpoint to "warm up" the server.
-
-2.  **Authentication**: We use a secure, cookie-based authentication system. The JWT token is stored in an `httpOnly` cookie. For your frontend requests to work, you **must** include `credentials: 'include'` in your `fetch` or `axios` configuration.
-
-3.  **CORS**: Cross-Origin Resource Sharing is configured to only allow requests from the following domains:
-    - `https://warnershoes.onrender.com` (Main Frontend)
-    - `https://warnershoesadmin.onrender.com` (Admin Frontend)
-    - `http://localhost:5173` (Local Development)
+Status: ✅ Production (Render)
 
 ---
 
-## API Reference
+## 1. Overview
 
-### Health Check
+Node.js + Express + MongoDB + Passport (Google OAuth) + JWT (httpOnly cookie) + ImageKit uploads.
 
-A simple endpoint to verify that the server is running.
+Auth flow: On login / register / Google callback we issue a 7‑day JWT and set it in a persistent httpOnly cookie `token` (and also return the token in JSON as a fallback). In production the cookie is: `SameSite=None; Secure`. In development: `SameSite=Lax; Secure=false`.
 
-- **GET** `/health`
-  - **Success Response (200):** `{"status": "OK", "timestamp": "..."}`
-
----
-
-### Authentication Endpoints
-
-Endpoints for user registration, login, and session management.
-
-#### 1. Register User
-
-- **POST** `/api/auth/register`
-- **Description:** Creates a new user account.
-- **Body:** `{ "name": "...", "email": "...", "password": "..." }`
-- **Success (201):** `{ "message": "User registered successfully", "user": {...} }`
-- **Error (400):** `{ "message": "Email already exists" }` or validation error.
-
-#### 2. Login User
-
-- **POST** `/api/auth/login`
-- **Description:** Authenticates a user and sets the session cookie.
-- **Body:** `{ "email": "...", "password": "..." }`
-- **Success (200):** `{ "message": "Login successful", "user": {...} }`
-- **Error (400):** `{ "message": "Invalid credentials" }`
-
-#### 3. Google OAuth Login
-
-- **GET** `/api/auth/google`
-- **Description:** Redirects the user to Google's OAuth screen. After successful authentication, the user is **redirected back to your frontend application** (as defined by `FRONTEND_URL` in `.env`). The session cookie is set automatically by the server.
-- **Usage:** Your frontend should have a "Login with Google" button that navigates to this URL. Your frontend application should then check the user's authentication status (e.g., by calling `/api/auth/me`) when it loads after the redirect.
-
-#### 4. Get Current Authenticated User
-
-- **GET** `/api/auth/me`
-- **Description:** Retrieves the currently logged-in user's basic info. Ideal for checking authentication status on app load.
-- **Auth:** Required.
-- **Success (200):** `{ "user": {...} }`
-- **Error (401):** `{ "message": "Not authorized, no token" }`
-
-#### 5. Logout User
-
-- **POST** `/api/auth/logout`
-- **Description:** Clears the session cookie, logging the user out.
-- **Auth:** Required.
-- **Success (200):** `{ "message": "Logged out successfully" }`
+All stateful frontend calls MUST include credentials so the cookie is sent.
 
 ---
 
-### User Profile Endpoints
+## 2. Environment Variables (.env)
 
-Endpoints for managing the logged-in user's profile.
+Required (example values already present):
 
-#### 1. Get User Profile
+PORT=5000
+NODE_ENV=production|development
+FRONTEND_URL=https://warnershoes.onrender.com
+ADMIN_FRONTEND_URL=https://warnershoesadmin.onrender.com
+MONGODB_URL=your-mongodb-uri
+JWT_SECRET=long-random-string
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+GOOGLE_SUCCESS_REDIRECT=https://warnershoes.onrender.com/
+IMAGE_KIT_PUBLIC_KEY=...
+IMAGE_KIT_PRIVATE_KEY=...
+IMAGE_KIT_URL_ENDPOINT=...
 
-- **GET** `/api/user/profile`
-- **Description:** Retrieves the full profile of the currently logged-in user.
-- **Auth:** Required.
-- **Success (200):** `{ "user": {...} }`
+Notes:
 
-#### 2. Update User Profile
-
-- **PATCH** `/api/user/profile`
-- **Description:** Updates the logged-in user's profile information.
-- **Auth:** Required.
-- **Body:** `{ "name": "...", "phone": "...", "oldPassword": "...", "password": "..." }` (any combination).
-- **Success (200):** `{ "message": "Profile updated successfully", "user": {...} }`
-- **Error (400):** For incorrect old password, trying to change password for a social login account, etc.
-
----
-
-### Admin Product Endpoints
-
-These endpoints are restricted to users with an `admin` role.
-
-#### 1. Add a New Product
-
-- **POST** `/api/admin/products`
-- **Description:** Creates a new product. Requires `multipart/form-data` for image uploads.
-- **Auth:** Admin Required.
-- **Headers:** `Content-Type: multipart/form-data`
-- **Body (form-data):**
-  - `img`: (File) One or more image files.
-  - `title`: (Text) "Premium Leather Shoes"
-  - `price`: (Text) `4999`
-  - `discount`: (Text) `10`
-  - `size`: (Text) `[8,9,10]` **(Must be a valid JSON array string)**
-  - `description`: (Text) "Handcrafted premium leather shoes with fine stitching."
-  - `color`: (Text) `["Black","Brown"]` **(Must be a valid JSON array string)**
-  - `country`: (Text) "India"
-  - `deliveryAndReturns`: (Text) "Free delivery and 30-day returns."
-  - `productInformation`: (Text) `{"material":"100% Genuine Leather","care":"Wipe with a clean, dry cloth."}` **(Must be a valid JSON object string)**
-  - `stock`: (Text) `100`
-- **Success (201):** `{ "message": "Product created successfully", "product": {...} }`
-
-#### 2. Get All Products (Admin View)
-
-- **GET** `/api/admin/products`
-- **Description:** Retrieves a paginated and filterable list of all products.
-- **Auth:** Admin Required.
-- **Query Params (optional):** `page`, `limit`, `search`, `color`, `size`.
-- **Success (200):** `{ "products": [...], "totalPages": ..., "currentPage": ..., "total": ... }`
-
-#### 3. Get Single Product by ID
-
-- **GET** `/api/admin/products/:id`
-- **Description:** Retrieves a single product by its ID.
-- **Auth:** Admin Required.
-- **Success (200):** `{ "product": {...} }`
-
-#### 4. Update Product
-
-- **PUT** `/api/admin/products/:id`
-- **Description:** Updates an existing product. Also uses `multipart/form-data`.
-- **Auth:** Admin Required.
-- **Headers:** `Content-Type: multipart/form-data`
-- **Body (form-data):** Any fields to update. New images will replace old ones.
-- **Success (200):** `{ "message": "Product updated successfully", "product": {...} }`
-
-#### 5. Delete Product
-
-- **DELETE** `/api/admin/products/:id`
-- **Description:** Deletes a product by its ID.
-- **Auth:** Admin Required.
-- **Success (200):** `{ "message": "Product deleted successfully" }`
+- Set NODE_ENV=production on Render so cookies become Secure + SameSite=None.
+- FRONTEND_URL / ADMIN_FRONTEND_URL must exactly match origins (protocol + domain + optional port).
 
 ---
 
-## Running the Project Locally
+## 3. Architecture
 
-1.  Create a `.env` file and populate it with your own credentials, including `FRONTEND_URL=http://localhost:5173` and `ADMIN_FRONTEND_URL=http://localhost:xxxx` (your local admin port).
-2.  Run `npm install` to install dependencies.
-3.  Run `npm start` to start the server on `http://localhost:5000`.
-
-**🚀 Backend is production-ready and fully tested!** 3. Run `npm start` to start the server on `http://localhost:5000`.
-
-**🚀 Backend is production-ready and fully tested!**
-
-- **GET** `/api/admin/products/:id`
-- **Description:** Retrieves a single product by its ID.
-- **Auth:** Admin Required.
-- **Success (200):** `{ "product": {...} }`
-
-#### 4. Update Product
-
-- **PUT** `/api/admin/products/:id`
-- **Description:** Updates an existing product. Also uses `multipart/form-data`.
-- **Auth:** Admin Required.
-- **Headers:** `Content-Type: multipart/form-data`
-- **Body (form-data):** Any fields to update. New images will replace old ones. Use the same `FormData` approach as for adding a product.
-- **Success (200):** `{ "message": "Product updated successfully", "product": {...} }`
-
-#### 5. Delete Product
-
-- **DELETE** `/api/admin/products/:id`
-- **Description:** Deletes a product by its ID.
-- **Auth:** Admin Required.
-- **Success (200):** `{ "message": "Product deleted successfully" }`
+src/app.js – Express app, CORS allowlist, trust proxy, routes.
+src/config/passport.js – Google OAuth strategy.
+src/config/db.js – Mongo connection.
+src/controllers – auth, user, product logic.
+src/middleware – auth (JWT), adminCheck, multer (memory storage).
+src/models – Mongoose schemas (User, Product).
+src/services/storage.service.js – ImageKit upload (memory buffer → remote URL).
+src/utils/validator.js – Password strength helper.
 
 ---
 
-## Running the Project Locally
+## 4. CORS & Cookies
 
-1.  Create a `.env` file and populate it with your own credentials.
-2.  Run `npm install` to install dependencies.
-3.  Run `npm start` to start the server on `http://localhost:5000`.
+Allowed origins: FRONTEND_URL, ADMIN_FRONTEND_URL, http://localhost:5173, http://localhost:3000.
 
-**🚀 Backend is production-ready and fully tested!**
-**GET** `/api/admin/products/:id`
+Credentials: true (so browser sends cookies).
 
-- **Success (200):** `{ "product": {...} }`
+Cookie options via central helper:
 
-#### 4. Update Product
+- Max Age: 7 days
+- httpOnly: true
+- Production: Secure + SameSite=None (cross‑site allowed)
+- Dev: Secure false + SameSite=Lax
 
-**PUT** `/api/admin/products/:id`
-
-- **Headers:** `Content-Type: multipart/form-data`
-- **Body (form-data):** Any fields to update. If you are sending new images, they will replace the old ones. The same rules for JSON strings apply here.
-- **Success (200):** `{ "message": "Product updated successfully", "product": {...} }`
-
-#### 5. Delete Product
-
-**DELETE** `/api/admin/products/:id`
-
-- **Success (200):** `{ "message": "Product deleted successfully" }`
+If the frontend is on a different domain and you forget `credentials: 'include'`, you will appear logged out.
 
 ---
 
-## Running the Project Locally
+## 5. Auth Lifecycle (Frontend Responsibilities)
 
-1. Create a `.env` file based on the provided variables.
-2. Run `npm install` to install dependencies.
-3. Run `npm start` to start the server.
+1. User registers or logs in → backend sets `token` cookie + returns JSON with `token` & `user`.
+2. On app load, call GET /api/auth/me (with credentials) to hydrate auth state.
+3. Optional: store returned user in global state (Redux/Zustand/etc.). Avoid storing password or raw cookie.
+4. For protected routes (profile, admin, product CRUD) always include credentials.
+5. Logout → POST /api/auth/logout (credentials) → clear cookie locally (backend clears). Then clear local state.
+6. Google OAuth: redirect user to /api/auth/google. After Google → backend callback sets cookie → redirects to FRONTEND_URL. Frontend should then invoke /api/auth/me.
 
-**🚀 Backend is production-ready and fully tested!**
+Fallback Token Usage: If a browser blocks third‑party cookies, you may capture `token` from the login/register response and send Authorization: Bearer <token> on each request (backend also checks Authorization header).
 
-### Current Mode
+---
 
-- Environment set to DEVELOPMENT for easier testing.
-- CORS: all origins allowed (with credentials).
-- Cookies: httpOnly, sameSite=lax, secure=false (will switch to secure & SameSite=None in production).
-- Do NOT rely on this setup for real production security.
+## 6. Endpoint Reference
 
-### Session Notes (Dev)
+Health: GET /health → { status, timestamp }
 
-- Token cookie persists 7 days (maxAge).
-- If cookie still disappears, verify:
-  1. Browser not clearing cookies on tab close.
-  2. Requests include `credentials: 'include'`.
-  3. No client-side code calling `/api/auth/logout`.
-- Fallback: use `token` returned in JSON as Bearer Authorization header.
+### Auth
 
-### Production TODO (later)
+POST /api/auth/register Body: { name, email, password }
+POST /api/auth/login Body: { email, password }
+GET /api/auth/google (redirect to Google)
+GET /api/auth/google/callback (internal – cookie set, redirects)
+GET /api/auth/me (requires cookie / bearer)
+POST /api/auth/logout
 
-- Reinstate trust proxy.
-- Tight CORS whitelist.
-- Cookie: secure:true & SameSite=None for cross-domain frontends.
-- Optional domain scope for shared subdomains.
+### User
 
-### Troubleshooting
+GET /api/user/profile
+PATCH /api/user/profile Body (any): { name, email, phone, oldPassword, password }
 
-#### Login Session Not Persisting After Refresh
+### Admin Products (require admin role)
 
-If you find that users are logged out after refreshing the page, it's almost always a cookie issue.
+POST /api/admin/products (multipart/form-data + images)
+GET /api/admin/products
+GET /api/admin/products/:id
+PUT /api/admin/products/:id (multipart/form-data)
+DELETE /api/admin/products/:id
 
-1.  **Persistent Cookies**: The backend is now configured to set a persistent cookie with a `maxAge` of 7 days for all login methods (local and Google).
-2.  **`credentials: 'include'`**: Ensure your frontend `fetch` or `axios` requests **always** include this option. Without it, the browser will not send the cookie back to the server on subsequent requests.
-3.  **Browser DevTools**: Use the "Application" tab in your browser's developer tools to inspect the cookie. Check that the `token` cookie exists, and that its `Expires / Max-Age` is set to a future date.
-4.  **`sameSite: 'lax'`**: The cookie policy has been updated to `lax` for better compatibility with cross-site redirects from Google.
+### Public Products (WIP)
 
-### Session / Token Behavior
+Current non-admin product routes scaffolded under /api/product (extend as needed).
 
-Browsers (Safari, Brave, some Chrome settings) may block cross-site cookies (SameSite=None) by default. To ensure reliability:
+---
 
-1. Backend sets httpOnly cookie (7 days) and also returns `token` in JSON.
-2. Frontend SHOULD send `credentials: 'include'` on every request.
-3. If cookie is absent after a refresh:
-   - Store `token` from login response (localStorage/sessionStorage) and send: `Authorization: Bearer <token>`.
+## 7. Product Upload (Frontend FormData Example)
+
+Example (fetch):
+
+```js
+async function createProduct(formValues, files) {
+  const fd = new FormData();
+  files.forEach((f) => fd.append("img", f)); // up to 5 images
+  fd.append("title", formValues.title);
+  fd.append("price", String(formValues.price));
+  fd.append("discount", String(formValues.discount || 0));
+  fd.append("size", JSON.stringify(formValues.size)); // e.g. [8,9,10]
+  fd.append("description", formValues.description);
+  fd.append("color", JSON.stringify(formValues.color)); // e.g. ["Black","Brown"]
+  fd.append("country", formValues.country || "");
+  fd.append("deliveryAndReturns", formValues.deliveryAndReturns || "");
+  fd.append(
+    "productInformation",
+    JSON.stringify({ material: formValues.material, care: formValues.care })
+  );
+  fd.append("stock", String(formValues.stock || 0));
+
+  const res = await fetch(`${API_BASE}/api/admin/products`, {
+    method: "POST",
+    body: fd,
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error("Create failed");
+  return res.json();
+}
+```
+
+Axios example:
+
+```js
+import axios from "axios";
+const api = axios.create({ baseURL: API_BASE, withCredentials: true });
+// api.post('/api/admin/products', fd)
+```
+
+---
+
+## 8. Auth Helpers (Frontend)
+
+Fetch wrapper:
+
+```js
+async function apiFetch(path, options = {}) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    credentials: "include",
+    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+    ...options,
+  });
+  if (res.status === 401) throw new Error("UNAUTHENTICATED");
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+```
+
+Login:
+
+```js
+async function login(email, password) {
+  return apiFetch("/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+}
+```
+
+Hydrate session on app start:
+
+```js
+async function loadSession() {
+  try {
+    return await apiFetch("/api/auth/me");
+  } catch {
+    return null;
+  }
+}
+```
+
+Google Login button:
+
+```js
+function loginWithGoogle() {
+  window.location.href = `${API_BASE}/api/auth/google`;
+}
+```
+
+Logout:
+
+```js
+async function logout() {
+  await apiFetch("/api/auth/logout", { method: "POST" });
+}
+```
+
+Bearer fallback (if cookie blocked):
+
+```js
+let fallbackToken = null; // set from login/register response
+async function bearerFetch(path, options = {}) {
+  const headers = {
+    "Content-Type": "application/json",
+    ...(options.headers || {}),
+  };
+  if (fallbackToken) headers.Authorization = `Bearer ${fallbackToken}`;
+  const res = await fetch(`${API_BASE}${path}`, {
+    credentials: "include",
+    ...options,
+    headers,
+  });
+  return res.json();
+}
+```
+
+---
+
+## 9. Image Handling
+
+Uploads use in-memory Multer, then ImageKit. The controller expects field name `img` (up to 5). Backend returns stored URLs in `product.img` array.
+
+Edge cases to avoid:
+
+- Missing images → 400
+- Invalid JSON strings for size/color/productInformation → 400
+
+---
+
+## 10. Security Notes
+
+JWT secret MUST be long & private.
+Never expose IMAGE_KIT_PRIVATE_KEY client-side.
+Do not store password hashes client-side (server already returns minimal user object).
+Use HTTPS in production (Render provides TLS) – secure cookies rely on it.
+
+---
+
+## 11. Local Development
+
+1. Copy .env and adjust FRONTEND_URL to your local frontend origin (e.g. http://localhost:5173).
+2. npm install
+3. npm start (default port 5000)
+4. Use MongoDB Atlas URI or local Mongo instance.
+5. Create an admin manually (in Mongo) or temporarily set role via DB to test admin routes.
+
+---
+
+## 12. Troubleshooting
+
+Cookie missing after login:
+
+- Check devtools → Application → Cookies: is `token` there?
+- Origin mismatch? Ensure your frontend origin matches env variable exactly.
+- Forgot credentials: 'include' ?
+- Browser privacy / third‑party blocking? Try fallback bearer token.
+
+Getting CORS error:
+
+- Confirm your origin is whitelisted (FRONTEND_URL / ADMIN_FRONTEND_URL).
+- If using a new local port, add it before redeploying.
+
+Google OAuth popup closes but no session:
+
+- Ensure callback URL matches one registered in Google Cloud console.
+- Check server logs for Passport errors.
+
+---
+
+## 13. Future Enhancements (Roadmap)
+
+- Public product browsing endpoints (pagination, filters) under /api/product
+- Password reset (email token)
+- Rate limiting & helmet hardening
+- Audit logs for admin actions
+- S3 backup for images (optional alongside ImageKit)
+
+---
+
+## 14. Quick Reference Cheat Sheet
+
+Auth check: GET /api/auth/me (credentials)
+Profile: GET /api/user/profile
+Update profile: PATCH /api/user/profile
+Admin add product: POST /api/admin/products (FormData)
+Logout: POST /api/auth/logout
+
+Always include: credentials: 'include'
+
+---
+
+Happy building – reach out if anything is unclear.
