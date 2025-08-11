@@ -11,21 +11,16 @@ const createToken = (user) => {
   );
 };
 
-const buildCookieOptions = () => {
-  const isProd = process.env.NODE_ENV === "production";
-  return {
-    httpOnly: true,
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-    secure: isProd,
-    sameSite: isProd ? "none" : "lax",
-    // domain: isProd ? ".onrender.com" : undefined, // uncomment only if you map to same parent domain
-  };
-};
-
-// Helper function to set the token cookie
+// Simplified (dev) cookie helper
 const sendTokenResponse = (res, user, message) => {
   const token = createToken(user);
-  res.cookie("token", token, buildCookieOptions());
+  res.cookie("token", token, {
+    httpOnly: true,
+    // NOT secure in dev so it stays visible across http(domains)/localhost
+    secure: false,
+    sameSite: "lax",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  });
   res.json({
     message,
     token, // expose so frontend can optionally store & send as Bearer
@@ -69,7 +64,7 @@ exports.register = async (req, res) => {
       password,
       role: "user",
     });
-    
+
     sendTokenResponse(res, user, "User registered successfully");
   } catch (err) {
     // Log error internally, but send generic message to client
@@ -93,11 +88,11 @@ exports.login = async (req, res) => {
     }
     // Check password
     const isMatch = await user.matchPassword(password);
-    
+
     if (!isMatch) {
       return res.status(400).json({ message: "Invalid credentials" });
     }
-    
+
     sendTokenResponse(res, user, "Login successful");
   } catch (err) {
     console.error("Login error:", err);
@@ -114,22 +109,28 @@ exports.googleCallback = (req, res) => {
     if (!user) {
       return res
         .status(401)
-        .redirect(`${process.env.FRONTEND_URL}/login?error=auth_failed`);
+        .redirect(`${process.env.FRONTEND_URL || ""}/login?error=auth_failed`);
     }
     const token = createToken(user);
-    res.cookie("token", token, buildCookieOptions());
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: false,
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
     res.redirect(process.env.FRONTEND_URL || "/");
   } catch (err) {
     console.error("Google OAuth error:", err);
-    res.redirect(`${process.env.FRONTEND_URL}/login?error=server_error`);
+    res.redirect(`${process.env.FRONTEND_URL || ""}/login?error=server_error`);
   }
 };
 
 // Controller for logging out the user (clears the JWT cookie)
 exports.logout = (req, res) => {
   res.clearCookie("token", {
-    ...buildCookieOptions(),
-    maxAge: 0,
+    httpOnly: true,
+    secure: false,
+    sameSite: "lax",
   });
   res.status(200).json({ message: "Logged out successfully" });
 };

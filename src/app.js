@@ -11,28 +11,14 @@ const adminRoutes = require("./routes/adminRoutes");
 
 const app = express();
 
-// Trust proxy (needed so secure cookies work on Render / proxies)
-app.set("trust proxy", 1);
-
 // Middleware
 app.use(express.json());
 
-const allowedOrigins = [
-  process.env.FRONTEND_URL,
-  process.env.ADMIN_FRONTEND_URL,
-  "http://localhost:5173",
-].filter(Boolean);
-
+// Simplified permissive CORS for development (all origins, with credentials)
 app.use(
   cors({
-    origin: (origin, cb) => {
-      if (!origin) return cb(null, true);
-      if (allowedOrigins.includes(origin)) return cb(null, true);
-      return cb(new Error("CORS: Origin not allowed"));
-    },
+    origin: true,
     credentials: true,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 app.use(morgan("dev"));
@@ -54,9 +40,6 @@ app.use("/api/user", userRoutes);
 app.use("/api/product", productRoutes);
 app.use("/api/admin", adminRoutes);
 
-// Debug (remove in production if not needed)
-app.get("/debug/cookies", (req, res) => {
-  res.json({ cookies: req.cookies || {}, message: "Cookie debug" });
-});
-
+// Remove debug route if not needed
+// app.get("/debug/cookies", (req,res)=>{ ... });
 module.exports = app;

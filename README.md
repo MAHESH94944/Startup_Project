@@ -224,6 +224,29 @@ These endpoints are restricted to users with an `admin` role.
 
 **🚀 Backend is production-ready and fully tested!**
 
+### Current Mode
+
+- Environment set to DEVELOPMENT for easier testing.
+- CORS: all origins allowed (with credentials).
+- Cookies: httpOnly, sameSite=lax, secure=false (will switch to secure & SameSite=None in production).
+- Do NOT rely on this setup for real production security.
+
+### Session Notes (Dev)
+
+- Token cookie persists 7 days (maxAge).
+- If cookie still disappears, verify:
+  1. Browser not clearing cookies on tab close.
+  2. Requests include `credentials: 'include'`.
+  3. No client-side code calling `/api/auth/logout`.
+- Fallback: use `token` returned in JSON as Bearer Authorization header.
+
+### Production TODO (later)
+
+- Reinstate trust proxy.
+- Tight CORS whitelist.
+- Cookie: secure:true & SameSite=None for cross-domain frontends.
+- Optional domain scope for shared subdomains.
+
 ### Troubleshooting
 
 #### Login Session Not Persisting After Refresh
