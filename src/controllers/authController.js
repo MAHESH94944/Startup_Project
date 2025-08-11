@@ -14,26 +14,18 @@ const createToken = (user) => {
 // Helper function to set the token cookie
 const sendTokenResponse = (res, user, message) => {
   const token = createToken(user);
-
-  const isProd = process.env.NODE_ENV === "production";
   const cookieOptions = {
     httpOnly: true,
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-    secure: isProd, // must be true when SameSite=None
-    sameSite: isProd ? "none" : "lax",
-    path: "/",
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "none", // allow cross-site (frontend + backend on different subdomains)
+    // Optional: set domain to '.onrender.com' if you later need sharing across more subdomains
+    // domain: '.onrender.com'
   };
-
   res.cookie("token", token, cookieOptions);
-
   res.json({
     message,
-    user: {
-      id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-    },
+    user: { id: user._id, name: user.name, email: user.email, role: user.role },
   });
 };
 
@@ -73,7 +65,7 @@ exports.register = async (req, res) => {
       password,
       role: "user",
     });
-
+    
     sendTokenResponse(res, user, "User registered successfully");
   } catch (err) {
     // Log error internally, but send generic message to client
@@ -97,11 +89,11 @@ exports.login = async (req, res) => {
     }
     // Check password
     const isMatch = await user.matchPassword(password);
-
+    
     if (!isMatch) {
       return res.status(400).json({ message: "Invalid credentials" });
     }
-
+    
     sendTokenResponse(res, user, "Login successful");
   } catch (err) {
     console.error("Login error:", err);
@@ -120,17 +112,15 @@ exports.googleCallback = (req, res) => {
         .status(401)
         .redirect(`${process.env.FRONTEND_URL}/login?error=auth_failed`);
     }
-
     const token = createToken(user);
-    const isProd = process.env.NODE_ENV === "production";
-    res.cookie("token", token, {
+    const cookieOptions = {
       httpOnly: true,
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      secure: isProd,
-      sameSite: isProd ? "none" : "lax",
-      path: "/",
-    });
-
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "none",
+      // domain: '.onrender.com' // optional as above
+    };
+    res.cookie("token", token, cookieOptions);
     res.redirect(process.env.FRONTEND_URL || "/");
   } catch (err) {
     console.error("Google OAuth error:", err);
@@ -140,12 +130,11 @@ exports.googleCallback = (req, res) => {
 
 // Controller for logging out the user (clears the JWT cookie)
 exports.logout = (req, res) => {
-  const isProd = process.env.NODE_ENV === "production";
   res.clearCookie("token", {
     httpOnly: true,
-    secure: isProd,
-    sameSite: isProd ? "none" : "lax",
-    path: "/",
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "none",
+    // domain: '.onrender.com' // include if you set domain when creating cookie
   });
   res.status(200).json({ message: "Logged out successfully" });
 };
@@ -164,3 +153,12 @@ exports.getMe = (req, res) => {
     },
   });
 };
+    user: {
+      id: req.user._id,
+      name: req.user.name,
+      email: req.user.email,
+      role: req.user.role,
+    },
+  });
+};
+ 

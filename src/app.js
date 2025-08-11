@@ -11,6 +11,9 @@ const adminRoutes = require("./routes/adminRoutes");
 
 const app = express();
 
+// Trust proxy (needed so secure cookies work on Render / proxies)
+app.set("trust proxy", 1);
+
 // Middleware
 app.use(express.json());
 
