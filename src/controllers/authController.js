@@ -2,28 +2,34 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const { isStrongPassword } = require("../utils/validator");
 
-// Helper function to create a JWT token for a user
-const createToken = (user) => {
-  return jwt.sign(
+// Helper: create JWT valid for 7 days
+const createToken = (user) =>
+  jwt.sign(
     { id: user._id, email: user.email, role: user.role },
     process.env.JWT_SECRET,
     { expiresIn: "7d" }
   );
+
+// Centralized cookie options so persistence is consistent everywhere.
+// In production (Render) frontend and backend are on different domains, so we need SameSite=None + Secure.
+// We also rely on app.set('trust proxy', 1) so secure cookies are accepted behind the proxy.
+const getCookieOptions = () => {
+  const isProd = process.env.NODE_ENV === "production";
+  return {
+    httpOnly: true,
+    secure: isProd, // must be true for SameSite=None cookies
+    sameSite: isProd ? "None" : "Lax",
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    path: "/",
+  };
 };
 
-// Simplified (dev) cookie helper
 const sendTokenResponse = (res, user, message) => {
   const token = createToken(user);
-  res.cookie("token", token, {
-    httpOnly: true,
-    // NOT secure in dev so it stays visible across http(domains)/localhost
-    secure: false,
-    sameSite: "lax",
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-  });
+  res.cookie("token", token, getCookieOptions());
   res.json({
     message,
-    token, // expose so frontend can optionally store & send as Bearer
+    token,
     user: { id: user._id, name: user.name, email: user.email, role: user.role },
   });
 };
@@ -112,12 +118,7 @@ exports.googleCallback = (req, res) => {
         .redirect(`${process.env.FRONTEND_URL || ""}/login?error=auth_failed`);
     }
     const token = createToken(user);
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: false,
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    res.cookie("token", token, getCookieOptions());
     res.redirect(process.env.FRONTEND_URL || "/");
   } catch (err) {
     console.error("Google OAuth error:", err);
@@ -127,11 +128,11 @@ exports.googleCallback = (req, res) => {
 
 // Controller for logging out the user (clears the JWT cookie)
 exports.logout = (req, res) => {
-  res.clearCookie("token", {
-    httpOnly: true,
-    secure: false,
-    sameSite: "lax",
-  });
+  // Use same cookie attributes to ensure proper clearing in browsers
+  const opts = getCookieOptions();
+  // clearCookie ignores maxAge, so we spread without it
+  const { maxAge, ...clearOpts } = opts;
+  res.clearCookie("token", clearOpts);
   res.status(200).json({ message: "Logged out successfully" });
 };
 
