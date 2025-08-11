@@ -235,11 +235,11 @@ If you find that users are logged out after refreshing the page, it's almost alw
 3.  **Browser DevTools**: Use the "Application" tab in your browser's developer tools to inspect the cookie. Check that the `token` cookie exists, and that its `Expires / Max-Age` is set to a future date.
 4.  **`sameSite: 'lax'`**: The cookie policy has been updated to `lax` for better compatibility with cross-site redirects from Google.
 
-### Cookie / Session Notes
+### Session / Token Behavior
 
-- Frontend and backend are on different subdomains → session cookie needs:
-  - sameSite: none
-  - secure: true (production)
-  - trust proxy enabled in app (app.set("trust proxy", 1))
-- Without SameSite=None the browser will NOT send the cookie on cross-site fetch/XHR calls, causing logout on refresh appearance.
-- Always use credentials: 'include' in frontend requests.
+Browsers (Safari, Brave, some Chrome settings) may block cross-site cookies (SameSite=None) by default. To ensure reliability:
+
+1. Backend sets httpOnly cookie (7 days) and also returns `token` in JSON.
+2. Frontend SHOULD send `credentials: 'include'` on every request.
+3. If cookie is absent after a refresh:
+   - Store `token` from login response (localStorage/sessionStorage) and send: `Authorization: Bearer <token>`.

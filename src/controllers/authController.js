@@ -11,20 +11,24 @@ const createToken = (user) => {
   );
 };
 
+const buildCookieOptions = () => {
+  const isProd = process.env.NODE_ENV === "production";
+  return {
+    httpOnly: true,
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    secure: isProd,
+    sameSite: isProd ? "none" : "lax",
+    // domain: isProd ? ".onrender.com" : undefined, // uncomment only if you map to same parent domain
+  };
+};
+
 // Helper function to set the token cookie
 const sendTokenResponse = (res, user, message) => {
   const token = createToken(user);
-  const cookieOptions = {
-    httpOnly: true,
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "none", // allow cross-site (frontend + backend on different subdomains)
-    // Optional: set domain to '.onrender.com' if you later need sharing across more subdomains
-    // domain: '.onrender.com'
-  };
-  res.cookie("token", token, cookieOptions);
+  res.cookie("token", token, buildCookieOptions());
   res.json({
     message,
+    token, // expose so frontend can optionally store & send as Bearer
     user: { id: user._id, name: user.name, email: user.email, role: user.role },
   });
 };
@@ -113,14 +117,7 @@ exports.googleCallback = (req, res) => {
         .redirect(`${process.env.FRONTEND_URL}/login?error=auth_failed`);
     }
     const token = createToken(user);
-    const cookieOptions = {
-      httpOnly: true,
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "none",
-      // domain: '.onrender.com' // optional as above
-    };
-    res.cookie("token", token, cookieOptions);
+    res.cookie("token", token, buildCookieOptions());
     res.redirect(process.env.FRONTEND_URL || "/");
   } catch (err) {
     console.error("Google OAuth error:", err);
@@ -131,10 +128,8 @@ exports.googleCallback = (req, res) => {
 // Controller for logging out the user (clears the JWT cookie)
 exports.logout = (req, res) => {
   res.clearCookie("token", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "none",
-    // domain: '.onrender.com' // include if you set domain when creating cookie
+    ...buildCookieOptions(),
+    maxAge: 0,
   });
   res.status(200).json({ message: "Logged out successfully" });
 };
@@ -153,4 +148,3 @@ exports.getMe = (req, res) => {
     },
   });
 };
-  
