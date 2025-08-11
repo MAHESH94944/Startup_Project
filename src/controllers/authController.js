@@ -10,35 +10,35 @@ const createToken = (user) =>
     { expiresIn: "7d" }
   );
 
-// Cookie options with environment-driven flexibility for cross-domain frontends.
-// Goals:
-// - Production (different domains) -> SameSite=None + Secure (required for modern browsers)
-// - Local dev (http://localhost:5173) -> Lax + not Secure so cookie is accepted over HTTP
-// Overrides via env:
-//   COOKIE_SAMESITE (None|Lax|Strict) and COOKIE_SECURE (true|false) if you need manual control.
+// Cookie config helper
 const getCookieOptions = () => {
-  const maxAge = 7 * 24 * 60 * 60 * 1000;
-  const envSameSite = process.env.COOKIE_SAMESITE; // optional override
-  const envSecure = process.env.COOKIE_SECURE; // optional override
+  const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days in ms
+  const envSameSite = process.env.COOKIE_SAMESITE;
+  const envSecure = process.env.COOKIE_SECURE;
   const isProd = process.env.NODE_ENV === "production";
 
-  let sameSite;
-  if (envSameSite) sameSite = envSameSite;
-  else sameSite = isProd ? "None" : "Lax";
+  // Handle SameSite
+  let sameSite = envSameSite || (isProd ? "None" : "Lax");
 
+  // Handle Secure flag
   let secure;
-  if (envSecure !== undefined) secure = envSecure === "true";
-  else secure = sameSite === "None"; // browsers require Secure when SameSite=None
+  if (envSecure !== undefined) {
+    secure = envSecure.toLowerCase() === "true";
+  } else {
+    secure = sameSite === "None" ? isProd : false;
+  }
 
   return {
     httpOnly: true,
     sameSite,
     secure,
     maxAge,
+    expires: new Date(Date.now() + maxAge), // ensures persistence in Safari/Firefox
     path: "/",
   };
 };
 
+// Send token in cookie + JSON response
 const sendTokenResponse = (res, user, message) => {
   const token = createToken(user);
   res.cookie("token", token, getCookieOptions());
@@ -49,11 +49,11 @@ const sendTokenResponse = (res, user, message) => {
   });
 };
 
-// Controller for user registration (local signup)
+// Register
 exports.register = async (req, res) => {
   try {
     const { name, email, password } = req.body;
-    // Basic input sanitization
+
     if (
       typeof name !== "string" ||
       typeof email !== "string" ||
@@ -66,19 +66,19 @@ exports.register = async (req, res) => {
         .status(400)
         .json({ message: "Name, email, and password required" });
     }
-    // Validate password strength
+
     if (!isStrongPassword(password)) {
       return res.status(400).json({
         message:
           "Password must be at least 6 characters and include uppercase, lowercase, number, and special character",
       });
     }
-    // Check if user already exists
+
     const userExists = await User.findOne({ email });
     if (userExists) {
       return res.status(400).json({ message: "User already exists" });
     }
-    // Create new user
+
     const user = await User.create({
       name,
       email,
@@ -88,28 +88,25 @@ exports.register = async (req, res) => {
 
     sendTokenResponse(res, user, "User registered successfully");
   } catch (err) {
-    // Log error internally, but send generic message to client
     console.error("Registration error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
 
-// Controller for user login (local login)
+// Login
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    // Basic input type validation
     if (typeof email !== "string" || typeof password !== "string") {
       return res.status(400).json({ message: "Invalid input types" });
     }
-    // Find user by email
+
     const user = await User.findOne({ email });
     if (!user || !user.password) {
       return res.status(400).json({ message: "Invalid credentials" });
     }
-    // Check password
-    const isMatch = await user.matchPassword(password);
 
+    const isMatch = await user.matchPassword(password);
     if (!isMatch) {
       return res.status(400).json({ message: "Invalid credentials" });
     }
@@ -121,9 +118,7 @@ exports.login = async (req, res) => {
   }
 };
 
-// Controller for Google OAuth callback
-// Called after Google redirects back to our server
-// Sets a persistent cookie and redirects to the frontend
+// Google OAuth callback
 exports.googleCallback = (req, res) => {
   try {
     const user = req.user;
@@ -141,17 +136,15 @@ exports.googleCallback = (req, res) => {
   }
 };
 
-// Controller for logging out the user (clears the JWT cookie)
+// Logout
 exports.logout = (req, res) => {
-  // Use same cookie attributes to ensure proper clearing in browsers
   const opts = getCookieOptions();
-  // clearCookie ignores maxAge, so we spread without it
-  const { maxAge, ...clearOpts } = opts;
+  const { maxAge, expires, ...clearOpts } = opts; // remove time-based fields
   res.clearCookie("token", clearOpts);
   res.status(200).json({ message: "Logged out successfully" });
 };
 
-// Controller to get current authenticated user's info
+// Get current user
 exports.getMe = (req, res) => {
   if (!req.user) {
     return res.status(401).json({ message: "Not authenticated" });
